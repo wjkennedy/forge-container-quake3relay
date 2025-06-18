@@ -1,0 +1,110 @@
+services:
+  - key: java-service
+    containers:
+      - key: java-service
+        tag: ${TAG}
+        health:
+          type: http
+          route:
+            path: /health
+
+modules:
+  sql:
+    - key: main
+      engine: mysql
+  jira:issuePanel:
+    - key: jira-issue-panel-container
+      resource: main
+      resolver:
+        endpoint: invoke-service-frontend-ep
+      render: native
+      title: jira-issue-panel-container
+      icon: https://developer.atlassian.com/platform/forge/images/icons/issue-panel-icon.svg
+  webtrigger:
+    - key: container-webtrigger
+      endpoint: webtrigger-ep
+    - key: run-migration
+      function: runMigration
+    - key: latest-scheduled-trigger-time
+      endpoint: latest-scheduled-trigger-time-ep
+    - key: async-event-publish-wt
+      endpoint: async-event-publish-ep
+    - key: async-event-retrieve-wt
+      endpoint: async-event-retrieve-ep
+  function:
+    - key: runMigration
+      handler: db.runMigration
+  trigger:
+    - key: container-product-trigger-event
+      endpoint: product-event-trigger-ep
+      events:
+        - avi:jira:updated:issue
+  scheduledTrigger:
+    - key: container-scheduled-trigger-event
+      endpoint: scheduled-trigger-ep
+      interval: hour
+    - key: db-migration-trigger
+      function: runMigration
+      interval: hour
+  consumer:
+    - key: async-event-consumer
+      queue: test-async-event-queue
+      endpoint: async-event-handle-ep
+      crossVersion: true
+  endpoint:
+    - key: webtrigger-ep
+      service: java-service
+      route:
+        path: /webtrigger
+    - key: async-event-publish-ep
+      service: java-service
+      route:
+        path: /async-events/publish
+    - key: async-event-handle-ep
+      service: java-service
+      route:
+        path: /async-events/handle
+    - key: async-event-retrieve-ep
+      service: java-service
+      route:
+        path: /async-events/latest
+    - key: product-event-trigger-ep
+      service: java-service
+      route:
+        path: /product-event-trigger
+    - key: scheduled-trigger-ep
+      service: java-service
+      route:
+        path: /scheduled-trigger
+    - key: latest-scheduled-trigger-time-ep
+      service: java-service
+      route:
+        path: /latest-scheduled-trigger-time
+    - key: invoke-service-frontend-ep
+      service: java-service
+
+permissions:
+  scopes:
+    - read:jira-user
+    - read:jira-work
+    - write:jira-work
+    - storage:app
+  external:
+    fetch:
+      backend:
+        - address: https://httpbin.org
+          inScopeEUD: false
+
+resources:
+  - key: main
+    path: src/frontend/index.jsx
+
+app:
+  runtime:
+    name: nodejs22.x
+  id: ari:cloud:ecosystem::app/${APP_ID}
+
+environment:
+  variables:
+    - TAG
+    - APP_ID

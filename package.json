@@ -1,0 +1,16 @@
+{
+  "name": "forge-containers-refapp",
+  "version": "1.0.0",
+  "license": "ISC",
+  "author": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "@forge/api": "^4.2.0",
+    "@forge/bridge": "^5.0.0",
+    "@forge/react": "^11.2.1",
+    "@forge/sql": "^2.5.0"
+  }
+}
