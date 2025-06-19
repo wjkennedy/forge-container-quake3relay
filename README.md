@@ -3,46 +3,43 @@
 [![Atlassian license](https://img.shields.io/badge/license-Apache%202.0-blue.svg?style=flat-square)](LICENSE)
 
 
-This Forge App demonstrates running Forge Container services.
+This reference application demonstrates the basics of using Forge Containers, which is currently available for testing by selected developers. Forge Containers is an [Early Access Program (EAP)](https://developer.atlassian.com/platform/forge/whats-coming/#forge-early-access-program--eap-) feature. 
 
 ## Table of Contents
 
 - [Environment Variables](#environment-variables)
-- [Getting Started](#getting-started)
-  - [Environment Setup](#environment-setup)
-  - [App Registration](#app-registration)
-  - [Configuring a Service](#configuring-a-service)
-  - [Build & Push Container Image](#build--push-container-image)
-  - [Deploy & Install Forge App](#deploy--install-forge-app)
-  - [Test Service Invocation](#test-service-invocation)
-- [View Container Logs](#view-container-logs)
-- [Test Service Invocation Locally](#test-service-invocation-locally)
+- [Get Started](#get-started)
+  - [Set up environment](#set-up-environment)
+  - [Register app](#register-app)
+- [Configure service](#configure-service)
+- [Build & push image](#build--push-image)
+- [Deploy & install Forge app](#deploy--install-forge-app)
+- [Test service invocation](#test-service-invocation)
+  - [Test service invocation locally](#test-service-invocation-locally)
+- [View container logs](#view-container-logs)
 - [License](#license)
 
-## Environment Variables
+## Environment Variables <a id="environment-variables"></a>
 
 This project uses several environment variables that need to be configured:
 
-| Variable | Description | Required | Default |
-|----------|-------------|----------|---------|
-| `APP_ID` | Unique identifier for your Forge app. Generated when you register your app using `forge register`. | Yes | - |
-| `TAG` | Version tag for your container images. Must be changed for each new image push as tags are immutable. | Yes | - |
-| `REPOSITORY_URI` | URI for your container image repository. Format: `forge-ecr.services.atlassian.com/forge/$APP_ID/java-service` | Yes | - |
-| `ENV_ID` | ID of the environment where your app is deployed. Used for local testing with `forge tunnel`. | For local testing | - |
+| Variable | Description | Required |
+|----------|-------------|----------|
+| `APP_ID` | Unique identifier for your Forge app. Generated when you [register your app](#register-app). | Yes |
+| `TAG` | Version tag for your container images. Must be changed for each new image push as tags are immutable. | Yes |
+| `REPOSITORY_URI` | URI for your container image repository. You'll create this repository [in a later step](#configure-service). | Yes |
+| `ENV_ID` | ID of the environment where your app is deployed. Used for local testing with `forge tunnel`. | For local testing |
 
-## Getting started
+## Get started <a id="get-started"></a>
 
-### Environment setup
+
+### Set up environment <a id="set-up-environment"></a>
 
 Before you begin, make sure you have set up your local development environment by following the [Forge Getting Started Guide](https://developer.atlassian.com/platform/forge/getting-started/).
 
-### App registration
+### Register app <a id="register-app"></a>
 
-Once your environment is set up, you'll need to register this example app under your own Atlassian account:
-
-This app's manifest uses two environment variables (namely, `TAG` and `APP_ID`). 
-
-You'll need to declare values for both:
+This app's manifest uses two environment variables (namely, `TAG` and `APP_ID`). You'll need to declare values for both:
 
 ```bash
 export APP_ID=
@@ -57,9 +54,12 @@ Register the app under your Atlassian Account:
 forge register
 ```
 
-### Configuring a service
+This command will replace the `app:id` field in your manifest with a new, unique app ID. You'll
+need to [submit this app ID to our team](https://ecosystem.atlassian.net/wiki/spaces/IC/pages/4342251535/Forge+Containers+-+EAP+Registration) so we can unblock Forge Containers for your app.
 
-Before you can start building services with Forge Containers, create a repository for your app's container images first. 
+## Configure service <a id="configure-service"></a>
+
+Before you can start building services with Forge Containers, first create a repository for your app's container images. 
 
 Use the `forge containers create` command to create a container named `java-service` (which is the same container key used in [manifest.yml](./manifest.yml)):
 
@@ -67,25 +67,23 @@ Use the `forge containers create` command to create a container named `java-serv
 forge containers create -k java-service
 ```
 
-You'll be provided with the repository URI for your container images. If needed, you can check the URI of every container repository for your app with `forge containers repositories`
+You'll be provided with the repository URI for your container images. If needed, you can check the URI of every container repository for your app with `forge containers repositories`.
 
-> **Tip:** Set URI as a variable.
-> 
-> We recommend that you set your `REPOSITORY_URI` as an environment variable, so you can easily access it later:
+> **TIP:** Set your URI as an environment variable, so you can easily access it later:
 > 
 > ```bash
 > export REPOSITORY_URI=forge-ecr.services.atlassian.com/forge/$APP_ID/java-service
 > ```
 
-### Build & Push Container Image
+## Build & push image <a id="build--push-image"></a>
 
-> **Important:** All `forge` CLI commands must be run from the root directory of the project (where the `manifest.yml` file is located). Make sure you're in the correct directory before running any commands.
+> **IMPORTANT:** All `forge` CLI commands must be run from the root directory of the project (where the `manifest.yml` file is located). Make sure you're in the correct directory before running any commands.
 
 In this app, the `java-service` is implemented as a Spring Boot Java Service to demonstrate Forge service invocations. This service's code is located in the [`/services/java-spring-server/`](/services/java-spring-server/) directory.
 
 To run this service on Forge Containers, you'll need to build its image and push that to your container image repository:
 
-#### Step 1: Build the Image
+### Step 1: Build the Image
 
 Create your service's container image locally. When creating a Docker image, build it for platform `linux/amd64`:
 
@@ -93,15 +91,15 @@ Create your service's container image locally. When creating a Docker image, bui
 docker build ./services/java-spring-server -t "$REPOSITORY_URI:$TAG" --platform linux/amd64 
 ```
 
-Note that we use the `REPOSITORY_URI` and `TAG` variables which we defined in earlier sections.
+> **NOTE:** We use the `REPOSITORY_URI` and `TAG` variables which we defined in earlier sections.
 
-#### Step 2: Authenticate the Docker CLI
+### Step 2: Authenticate the Docker CLI
 
 You'll need to authenticate the Docker CLI before you can use it to push images to your app's container repository. To do this, use the `forge containers docker-login` command.
 
-This command will use your forge login credentials to create a temporary API token bound to this application that the Docker CLI will use to authenticate with Forge Containers.
+This command will use your `forge login` credentials to create a temporary API token and bind it to this application (to authenticate Docker CLI for Forge Containers).
 
-#### Step 3: Push an image 
+### Step 3: Push an image 
 
 You can now use `docker push` to upload the image you built locally:
 
@@ -109,19 +107,19 @@ You can now use `docker push` to upload the image you built locally:
 docker push "$REPOSITORY_URI:$TAG"
 ```
 
-Note: Forge Container image tags are immutable so you will need to change the value of `TAG` to push additional changes.
+> **NOTE:** Forge Container image tags are immutable so you will need to change the value of `TAG` to push additional changes.
 
-### Deploy & install Forge app
+## Deploy & install Forge app <a id="deploy--install-forge-app"></a>
 
 Since this capability is currently in EAP, you'll only be able to deploy your app in a development or custom [environment](https://developer.atlassian.com/platform/forge/environments-and-versions/#environments). See [Command: deploy](https://developer.atlassian.com/platform/forge/cli-reference/deploy/) for related details.
 
 Once deployed you will need to install your app. See [Command: install](https://developer.atlassian.com/platform/forge/cli-reference/install/) for related details.
 
-### Test service invocation
+## Test service invocation <a id="test-service-invocation"></a>
 
 This app has a prepared webtrigger named `container-webtrigger` which can invoke `java-service`. To test this, create a webtrigger URL for `container-webtrigger` (see [Command: webtrigger](https://developer.atlassian.com/platform/forge/cli-reference/webtrigger/) for related details) on your site. 
 
-Once you have your webtrigger URL, invoke it via curl to return a message from `java-service`:
+Once you have your webtrigger URL, invoke it via `curl` to return a message from `java-service`:
 
 ```bash
 curl -X POST "$WEB_TRIGGER_URL"
@@ -137,13 +135,9 @@ This message verifies that the `java-service` instance hosted on Forge Container
 
 The webtrigger implementation can be found in [`WebTriggerEndpoint.java`](services/java-spring-server/src/main/java/com/atlassian/container/WebTriggerEndpoint.java).
 
-### View container logs
+### Test service invocation locally <a id="test-service-invocation-locally"></a>
 
-You can view logs for service invocations using the `forge logs --containers` command. Each log will contain relevant metadata for each log, including an invocationId to trace the log's invocation context.
-
-### Test service invocation locally
-
-You can use `forge tunnel` to test your containerised service locally before uploading its image to Forge Containers. To do this, you'll need to first download the Forge Containers platform sidecar using docker pull (you may need to re-authenticate the Docker CLI first):
+You can use `forge tunnel` to test your containerised service locally before uploading its image to Forge Containers. To do this, you'll need to first download the Forge Containers platform sidecar using `docker pull` (you may need to re-authenticate the Docker CLI first):
 
 ```bash
 forge containers docker-login
@@ -163,10 +157,13 @@ docker compose up --build -d
 
 After launching the service locally, run `forge tunnel`. The tunnel will route all invocations from your app installation to the local instance of your service.
 
- The above can be automated by updating and running the included [dev-loop.sh](./dev-loop.sh)
+> **TIP:** You can automate these commands by updating the included [dev-loop.sh](./dev-loop.sh) script.
 
+## View container logs <a id="view-container-logs"></a>
 
-## License
+You can view logs for service invocations using the `forge logs --containers` command.
+
+## License <a id="license"></a>
 Copyright (c) 2025 Atlassian US., Inc.
 Apache 2.0 licensed, see [LICENSE](LICENSE) file.
 

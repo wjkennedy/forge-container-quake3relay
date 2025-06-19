@@ -12,9 +12,11 @@ const App = () => {
             const data = await invokeService({
                 method: 'POST',
                 path: '/invoke-service',
-                body: {
-                    'message': 'Hello from jira issue panel'
-                },
+                body: JSON.stringify(
+                    {
+                        'message': 'Hello from jira issue panel'
+                    }
+                ),
                 headers: {
                     'x-custom-request-header': 'x-custom-request-header-value'
                 }
