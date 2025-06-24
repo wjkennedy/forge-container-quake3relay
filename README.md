@@ -37,6 +37,8 @@ This project uses several environment variables that need to be configured:
 
 Before you begin, make sure you have set up your local development environment by following the [Forge Getting Started Guide](https://developer.atlassian.com/platform/forge/getting-started/).
 
+You'll also need to install version `12.0.0` (or later) of the Forge CLI. This version includes all the CLI tools required to manage containers. 
+
 ### Register app <a id="register-app"></a>
 
 This app's manifest uses two environment variables (namely, `TAG` and `APP_ID`). You'll need to declare values for both:
