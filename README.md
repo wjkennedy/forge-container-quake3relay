@@ -1,9 +1,9 @@
-# Forge Container Compute - Reference Application
+# Reference Jira Application for Forge Containers
 
 [![Atlassian license](https://img.shields.io/badge/license-Apache%202.0-blue.svg?style=flat-square)](LICENSE)
 
 
-This reference application demonstrates the basics of using Forge Containers, which is currently available for testing by selected developers. Forge Containers is an [Early Access Program (EAP)](https://developer.atlassian.com/platform/forge/whats-coming/#forge-early-access-program--eap-) feature. 
+This reference application for Jira demonstrates the basics of using Forge Containers, which is currently available for testing by selected developers. Forge Containers is an [Early Access Program (EAP)](https://developer.atlassian.com/platform/forge/whats-coming/#forge-early-access-program--eap-) feature. 
 
 ## Table of Contents
 
@@ -19,7 +19,7 @@ This reference application demonstrates the basics of using Forge Containers, wh
 - [View container logs](#view-container-logs)
 - [License](#license)
 
-## Environment Variables <a id="environment-variables"></a>
+## Environment variables <a id="environment-variables"></a>
 
 This project uses several environment variables that need to be configured:
 
@@ -37,7 +37,7 @@ This project uses several environment variables that need to be configured:
 
 Before you begin, make sure you have set up your local development environment by following the [Forge Getting Started Guide](https://developer.atlassian.com/platform/forge/getting-started/).
 
-You'll also need to install version `12.0.0` (or later) of the Forge CLI. This version includes all the CLI tools required to manage containers. 
+You'll also need to install version `12.0.0` (or later) of the Forge CLI. This version includes all the CLI tools required to manage containers.
 
 ### Register app <a id="register-app"></a>
 
@@ -85,7 +85,7 @@ In this app, the `java-service` is implemented as a Spring Boot Java Service to 
 
 To run this service on Forge Containers, you'll need to build its image and push that to your container image repository:
 
-### Step 1: Build the Image
+### Step 1: Build the image
 
 Create your service's container image locally. When creating a Docker image, build it for platform `linux/amd64`:
 
@@ -115,7 +115,7 @@ docker push "$REPOSITORY_URI:$TAG"
 
 Since this capability is currently in EAP, you'll only be able to deploy your app in a development or custom [environment](https://developer.atlassian.com/platform/forge/environments-and-versions/#environments). See [Command: deploy](https://developer.atlassian.com/platform/forge/cli-reference/deploy/) for related details.
 
-Once deployed you will need to install your app. See [Command: install](https://developer.atlassian.com/platform/forge/cli-reference/install/) for related details.
+Once deployed, you will need to install the app on your site's Jira context. See [Command: install](https://developer.atlassian.com/platform/forge/cli-reference/install/) for related details.
 
 ## Test service invocation <a id="test-service-invocation"></a>
 
