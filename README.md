@@ -119,7 +119,9 @@ Once deployed, you will need to install the app on your site's Jira context. See
 
 ## Test service invocation <a id="test-service-invocation"></a>
 
-This app has a prepared webtrigger named `container-webtrigger` which can invoke `java-service`. To test this, create a webtrigger URL for `container-webtrigger` (see [Command: webtrigger](https://developer.atlassian.com/platform/forge/cli-reference/webtrigger/) for related details) on your site. 
+This app has a prepared webtrigger named `container-webtrigger` which can invoke `java-service`.  It demonstrates various features of the Forge platform; the implementation can be found in [WebTriggerEndpoint.java](services/java-spring-server/src/main/java/com/atlassian/container/WebTriggerEndpoint.java).
+
+To try this, create a webtrigger URL for `container-webtrigger` (see [Command: webtrigger](https://developer.atlassian.com/platform/forge/cli-reference/webtrigger/) for related details) on your site. 
 
 Once you have your webtrigger URL, invoke it via `curl` to return a message from `java-service`:
 
@@ -135,7 +137,12 @@ If successful this should return:
 
 This message verifies that the `java-service` instance hosted on Forge Containers received and responded to the webtrigger invocation.
 
-The webtrigger implementation can be found in [`WebTriggerEndpoint.java`](services/java-spring-server/src/main/java/com/atlassian/container/WebTriggerEndpoint.java).
+#### Troubleshooting
+
+If the request is **unsuccessful** with 424 Failed Dependency, it could be related to the use of Forge SQL in the webtrigger implementation.
+
+The `container-webtrigger` queries a database which is set up automatically using an hourly scheduled trigger. If you call the `container-webtrigger` before the database set up has occurred, the request will fail. To mitigate this, you can run the migration manually by creating and requesting the webtrigger `runMigration`.
+
 
 ### Test service invocation locally <a id="test-service-invocation-locally"></a>
 
