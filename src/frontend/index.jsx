@@ -11,7 +11,7 @@ const App = () => {
         const fetchData = async () => {
             const data = await invokeService({
                 method: 'POST',
-                path: '/invoke-service',
+                path: '/invoke-service?exampleStr=jira&exampleInt=123',
                 body: JSON.stringify(
                     {
                         'message': 'Hello from jira issue panel'
@@ -44,6 +44,7 @@ const App = () => {
                 <Text>body.message: {data?.body?.message}</Text>
                 <Text>body.requestDetails.headers: {JSON.stringify(data?.body?.requestDetails?.headers, null, 2)}</Text>
                 <Text>body.requestDetails.body: {JSON.stringify(data?.body?.requestDetails?.body, null, 2)}</Text>
+                <Text>body.requestDetails.queryParameters: {JSON.stringify(data?.body?.requestDetails?.queryParameters, null, 2)}</Text>
             </>
         );
     }

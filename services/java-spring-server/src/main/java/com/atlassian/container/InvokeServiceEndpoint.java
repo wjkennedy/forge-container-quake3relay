@@ -1,5 +1,6 @@
 package com.atlassian.container;
 
+import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
@@ -7,7 +8,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import static com.atlassian.container.api.ForgeIngressHeaders.*;
@@ -18,10 +21,15 @@ public class InvokeServiceEndpoint {
     private static final Logger log = LoggerFactory.getLogger(InvokeServiceEndpoint.class);
 
     @PostMapping("/invoke-service")
-    public ResponseEntity<Map<String, Object>> post(@RequestHeader Map<String, String> headers, @RequestHeader(INVOCATION_ID) String invocationId, @RequestBody Object body) {
+    public ResponseEntity<Map<String, Object>> post(@RequestHeader Map<String, String> headers,
+                                                    @RequestHeader(INVOCATION_ID) String invocationId,
+                                                    @RequestBody Object body,
+                                                    @RequestParam(required = false) String exampleStr,
+                                                    @RequestParam(required = false) Integer exampleInt) {
         log.info("Received invocationId: {}", invocationId);
         log.info("Received headers: {}", headers);
         log.info("Received body: {}", body);
+        log.info("Received query parameters: exampleStr={}, exampleInt={}", exampleStr, exampleInt);
 
         // set a custom header on the response
         HttpHeaders responseHeaders = new HttpHeaders();
@@ -34,6 +42,10 @@ public class InvokeServiceEndpoint {
         Map<String, Object> requestDetails = new HashMap<>();
         requestDetails.put("headers", headers);
         requestDetails.put("body", body);
+        requestDetails.put("queryParameters", Map.of(
+                "exampleStr", exampleStr,
+                "exampleInt", exampleInt
+        ));
         responseBody.put("requestDetails", requestDetails);
 
         return new ResponseEntity<>(responseBody, responseHeaders, HttpStatus.OK);
