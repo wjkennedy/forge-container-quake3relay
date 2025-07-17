@@ -20,6 +20,7 @@ services:
       - APP_ID=ari:cloud:ecosystem::app/$APP_ID
       - ENV_ID=ari:cloud:ecosystem::environment/$APP_ID/$ENV_ID
       - JWKS_URL=https://forge.cdn.prod.atlassian-dev.net/.well-known/jwks.json
+      - IS_LOCAL_DEV=true
     ports:
       - "7071:7071"
     depends_on:

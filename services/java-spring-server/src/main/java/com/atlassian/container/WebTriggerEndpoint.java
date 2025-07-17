@@ -5,11 +5,13 @@ import com.atlassian.container.db.BookRepository;
 import com.fasterxml.jackson.databind.JsonNode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.ExceptionHandler;
 
 import java.util.Map;
 import java.util.Optional;
@@ -39,7 +41,10 @@ public class WebTriggerEndpoint {
         log.info("Invocation context: {}", invocationContext.getBody());
 
         //Make Egress Request
-        log.info("Received egress status code: {}", egressClient.getStatusCode(invocationId));
+        final String egressUrl = "httpbin.org/get?key=value";
+        final ResponseEntity<JsonNode> egressResponse = egressClient.sendEgressRequest(invocationId, HttpMethod.GET, egressUrl);
+        log.info("Received egress response: {}", egressResponse);
+        validateEgressResponse(egressResponse, "https://" + egressUrl);
 
         //Make Jira Request
         log.info("Received Jira response: {}", egressClient.getAppUserInfo(invocationId));
@@ -55,5 +60,23 @@ public class WebTriggerEndpoint {
         log.info("Fetched book by title: {}", bookByTitle);
 
         return singletonMap("message", "Hello Forge Container World");
+    }
+
+    private void validateEgressResponse(final ResponseEntity<JsonNode> response, final String expectedUrl) {
+        final String requestedUrl = Optional.ofNullable(response.getBody())
+                .map(body -> body.get("url"))
+                .map(JsonNode::asText)
+                .orElse(null);
+
+        if (!expectedUrl.equals(requestedUrl)) {
+            log.error("Egress response URL mismatch: expected '{}', got '{}'", expectedUrl, requestedUrl);
+            throw new IllegalStateException("Egress response URL mismatch: expected '" + expectedUrl + "', got '" + requestedUrl + "'");
+        }
+    }
+
+    @ExceptionHandler(IllegalStateException.class)
+    public ResponseEntity<Map<String, String>> handleIllegalState(IllegalStateException ex) {
+        log.error("Internal server error: {}", ex.getMessage());
+        return ResponseEntity.internalServerError().body(singletonMap("error", ex.getMessage()));
     }
 }

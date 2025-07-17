@@ -43,10 +43,6 @@ public class EgressClient {
     this.restClient = restClientBuilder.build();
   }
 
-  public ResponseEntity<JsonNode> getStatusCode(final String invocationId) {
-    return sendEgressRequest(invocationId, HttpMethod.GET, "httpbin.org/status/200");
-  }
-
   public ResponseEntity<JsonNode> getInvocationContext(final String invocationId) {
     var uri = URI.create(egressProxyUrl + "/invocation/context");
     return sendRequest("Context request", invocationId, HttpMethod.GET, uri, null);
