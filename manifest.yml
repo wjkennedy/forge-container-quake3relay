@@ -21,6 +21,8 @@ modules:
       title: jira-issue-panel-container
       icon: https://developer.atlassian.com/platform/forge/images/icons/issue-panel-icon.svg
   webtrigger:
+    - key: webtrigger-realtime
+      endpoint: webtrigger-ep-realtime
     - key: container-webtrigger
       endpoint: webtrigger-ep
     - key: run-migration
@@ -52,6 +54,10 @@ modules:
       endpoint: async-event-handle-ep
       crossVersion: true
   endpoint:
+    - key: webtrigger-ep-realtime
+      service: java-service
+      route:
+        path: /webtrigger/realtime
     - key: webtrigger-ep
       service: java-service
       route:

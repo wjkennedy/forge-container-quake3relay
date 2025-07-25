@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import ForgeReconciler, { Text } from '@forge/react';
-import { invokeService } from '@forge/bridge';
+import { invokeService, __realtime } from '@forge/bridge';
 
 const App = () => {
     const [data, setData] = useState(null);
+    const [realtimeData, setRealtimeData] = useState(null);
 
     useEffect(() => {
         console.log("Calling POST /invoke-service ...")
@@ -28,6 +29,20 @@ const App = () => {
         fetchData()
     }, []);
 
+    useEffect(() => {
+        // This subscribes to a channel called "forge-container-realtime-channel", the "webtrigger-realtime" endpoint will publish to this channel.
+        const subscribeToTopic = async () => {
+            const onEvent = (payload) => {
+                console.log('Received event with payload...: ', payload);
+                setRealtimeData(payload);
+            };
+            const subscription = await __realtime.subscribe('forge-container-realtime-channel', onEvent);
+            console.log('Subscribed to channel: forge-container-realtime-channel', subscription);
+        }
+
+          subscribeToTopic();
+    }, []);
+
     if (!data) {
         return (
             <>
@@ -38,6 +53,7 @@ const App = () => {
     } else {
         return (
             <>
+                <Text size="large">Realtime event received: {JSON.stringify(realtimeData, null, 2)}</Text>
                 <Text size="large">Data received from invokeService request</Text>
                 <Text>status: {data?.status}</Text>
                 <Text>headers: {JSON.stringify(data?.headers, null, 2)}</Text>

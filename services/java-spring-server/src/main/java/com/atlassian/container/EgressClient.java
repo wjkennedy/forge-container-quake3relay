@@ -110,6 +110,16 @@ public class EgressClient {
             .orElseGet(() -> sendRequest("Jira request", invocationId, httpMethod, uri, authType));
   }
 
+  public ResponseEntity<JsonNode> publishRealtimeMessage(final String invocationId, final String channelName, final String payload) {
+    var uri = URI.create(egressProxyUrl + "/forge/realtime/publish");
+
+    final ObjectNode realtimeEvent = objectMapper.createObjectNode()
+            .put("name", channelName)
+            .put("payload", payload);
+
+    return sendRequestWithBody("Publish realtime message", invocationId, HttpMethod.POST, uri, realtimeEvent, AuthType.app);
+  }
+
   public ResponseEntity<JsonNode> runSQLQuery(final String invocationId, final String query,
           final List<Object> params) {
 
