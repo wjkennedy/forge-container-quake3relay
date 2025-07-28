@@ -1,19 +1,20 @@
 package com.atlassian.container;
 
-import jakarta.servlet.http.HttpServletRequest;
+import java.util.HashMap;
+import java.util.Map;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-
-import static com.atlassian.container.api.ForgeIngressHeaders.*;
+import static com.atlassian.container.api.ForgeIngressHeaders.INVOCATION_ID;
 
 @RestController
 public class InvokeServiceEndpoint {
@@ -30,6 +31,7 @@ public class InvokeServiceEndpoint {
         log.info("Received headers: {}", headers);
         log.info("Received body: {}", body);
         log.info("Received query parameters: exampleStr={}, exampleInt={}", exampleStr, exampleInt);
+        log.info("Read forge environment variable FORGE_REFERENCE_APP_KEY={}", System.getenv("FORGE_REFERENCE_APP_KEY"));
 
         // set a custom header on the response
         HttpHeaders responseHeaders = new HttpHeaders();

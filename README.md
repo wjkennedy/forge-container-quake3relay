@@ -110,6 +110,12 @@ docker push "$REPOSITORY_URI:$TAG"
 
 ## Deploy & install Forge app <a id="deploy--install-forge-app"></a>
 
+Unencrypted forge [environment variables](https://developer.atlassian.com/platform/forge/cli-reference/variables/) will become accessible by forge app code after running `forge deploy`. To test this, first set a forge environment variable which will then be visible when logged inside of [InvokeServiceEndpoint.java](services/java-spring-server/src/main/java/com/atlassian/container/InvokeServiceEndpoint.java).
+
+```bash
+forge variables set FORGE_REFERENCE_APP_KEY FORGE_REFERENCE_APP_VALUE
+```
+
 Since this capability is currently in EAP, you'll only be able to deploy your app in a development or custom [environment](https://developer.atlassian.com/platform/forge/environments-and-versions/#environments). See [Command: deploy](https://developer.atlassian.com/platform/forge/cli-reference/deploy/) for related details.
 
 Once deployed, you will need to install the app on your site's Jira context. See [Command: install](https://developer.atlassian.com/platform/forge/cli-reference/install/) for related details.
