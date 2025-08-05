@@ -122,9 +122,9 @@ Once deployed, you will need to install the app on your site's Jira context. See
 
 ## Test service invocation <a id="test-service-invocation"></a>
 
-This app has a prepared webtrigger named `container-webtrigger` which can invoke `java-service`. It demonstrates various features of the Forge platform; the implementation can be found in [WebTriggerEndpoint.java](services/java-spring-server/src/main/java/com/atlassian/container/WebTriggerEndpoint.java).
+This app has a prepared webtrigger named `http-webtrigger` which can invoke `java-service`. It demonstrates various features of the Forge platform; the implementation can be found in [WebTriggerEndpoint.java](services/java-spring-server/src/main/java/com/atlassian/container/WebTriggerEndpoint.java).
 
-To try this, create a webtrigger URL for `container-webtrigger` (see [Command: webtrigger](https://developer.atlassian.com/platform/forge/cli-reference/webtrigger/) for related details) on your site.
+To try this, create a webtrigger URL for `http-webtrigger` (see [Command: webtrigger](https://developer.atlassian.com/platform/forge/cli-reference/webtrigger/) for related details) on your site.
 
 Once you have your webtrigger URL, invoke it via `curl` to return a message from `java-service`:
 
@@ -144,7 +144,7 @@ This message verifies that the `java-service` instance hosted on Forge Container
 
 If the request is **unsuccessful** with 424 Failed Dependency, it could be related to the use of Forge SQL in the webtrigger implementation.
 
-The `container-webtrigger` queries a database which is set up automatically using an hourly scheduled trigger. If you call the `container-webtrigger` before the database set up has occurred, the request will fail. To mitigate this, you can run the migration manually by creating and requesting the webtrigger `runMigration`.
+The `sql-webtrigger` queries a database which is set up automatically using an hourly scheduled trigger. If you call the `sql-webtrigger` before the database set up has occurred, the request will fail. To mitigate this, you can run the migration manually by creating and requesting the webtrigger `runMigration`.
 
 ### Test service invocation locally <a id="test-service-invocation-locally"></a>
 
@@ -159,6 +159,7 @@ The platform sidecar uses several environment variables to connect to your app a
 
 - `APP_ID`: your unique app ID, created earlier through forge register.
 - `ENV_ID`: the ID of the environment where your app is currently deployed; to view all environments (and corresponding IDs), use `forge environments list`.
+- `IS_LOCAL_DEV`: set this to `true` to let Forge make the necessary adjustments for calls coming from a local sidecar instance.
 
 Once you're ready to test your service, build its image locally and launch it in the background:
 

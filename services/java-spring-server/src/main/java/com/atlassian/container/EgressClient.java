@@ -152,6 +152,49 @@ public class EgressClient {
   }
 
   /**
+   * A Forge KvsTransactionRequest is a JSON object with the following structure:
+   * {
+   *   "set": [
+   *      {
+   *        "key": "<string>",
+   *        "value": "<string>",
+   *      }
+   *    ],
+   *   "delete": [
+   *      {
+   *        "key": "<string>",
+   *      }
+   *    ],
+   *   "check": [
+   *      {
+   *        "key": "<string>",
+   *      }
+   *    ]
+   * 
+   * Reference: https://developer.atlassian.com/platform/forge/rest/api-group-transaction/#api-v1-transaction-post-request 
+   */
+  public record SetTransactionSchema(String key, String value) {}
+  public record BaseTransactionSchema(String key) {}
+  public record KvsTransactionRequest(List<SetTransactionSchema> set, List<BaseTransactionSchema> delete, List<BaseTransactionSchema> check) {}
+
+  public ResponseEntity<JsonNode> executeKvsTransaction(final String invocationId, final KvsTransactionRequest data) {
+
+    final ObjectNode transactionRequest = objectMapper.createObjectNode();
+
+    var setArray = transactionRequest.putArray("set");
+    data.set.forEach(setOperation -> setArray.add(objectMapper.valueToTree(setOperation)));
+
+    var deleteArray = transactionRequest.putArray("delete");
+    data.delete.forEach(deleteOperation -> deleteArray.add(objectMapper.valueToTree(deleteOperation)));
+
+    var checkArray = transactionRequest.putArray("check");
+    data.check.forEach(checkOperation -> checkArray.add(objectMapper.valueToTree(checkOperation)));
+
+    var uri = URI.create(egressProxyUrl + "/forge/storage/kvs/v1/transaction");
+    return sendRequestWithBody("Execute KVS transaction", invocationId, HttpMethod.POST, uri, transactionRequest, null);
+  }
+
+  /**
    * A Forge AsyncEvent is a JSON object with the following structure:
    * {
    *   "body": {

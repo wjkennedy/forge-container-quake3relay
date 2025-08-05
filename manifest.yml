@@ -23,8 +23,12 @@ modules:
   webtrigger:
     - key: webtrigger-realtime
       endpoint: webtrigger-ep-realtime
-    - key: container-webtrigger
-      endpoint: webtrigger-ep
+    - key: http-webtrigger
+      endpoint: webtrigger-http
+    - key: sql-webtrigger
+      endpoint: webtrigger-sql
+    - key: kvs-webtrigger
+      endpoint: webtrigger-kvs-transaction  
     - key: run-migration
       function: runMigration
     - key: latest-scheduled-trigger-time
@@ -62,6 +66,18 @@ modules:
       service: java-service
       route:
         path: /webtrigger
+    - key: webtrigger-http
+      service: java-service
+      route:
+        path: /webtrigger/http
+    - key: webtrigger-sql
+      service: java-service
+      route:
+        path: /webtrigger/sql 
+    - key: webtrigger-kvs-transaction
+      service: java-service
+      route:
+        path: /webtrigger/kvs-transaction
     - key: async-event-publish-ep
       service: java-service
       route:
