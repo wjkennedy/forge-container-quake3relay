@@ -45,6 +45,7 @@ modules:
       endpoint: product-event-trigger-ep
       events:
         - avi:jira:updated:issue
+        - avi:jira:assigned:issue
   scheduledTrigger:
     - key: container-scheduled-trigger-event
       endpoint: scheduled-trigger-ep
@@ -107,10 +108,11 @@ modules:
 
 permissions:
   scopes:
-    - read:jira-user
-    - read:jira-work
-    - write:jira-work
-    - storage:app
+    read:jira-user: {}
+    read:jira-work: {}
+    write:jira-work:
+      allowImpersonation: true
+    storage:app: {}
   external:
     fetch:
       backend:

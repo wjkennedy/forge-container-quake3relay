@@ -36,7 +36,10 @@ public class ProductEventTriggerEndpoint {
 
         log.info("Event Type: {}", eventType);
 
-        if (eventType.equals("avi:jira:updated:issue")) {
+        if (eventType.equals("avi:jira:assigned:issue")) {
+            // Triggers a user impersonation call to send a comment as the assigned user
+            handleJiraAssignedIssue(invocationId, event);
+        } else if (eventType.equals("avi:jira:updated:issue")) {
             handleJiraUpdatedIssue(invocationId, event);
         }
     }
@@ -57,22 +60,38 @@ public class ProductEventTriggerEndpoint {
 
             log.info("Commenting on issue key: {}", issueKey);
 
-            AtlassianDocumentFormat document =
-                    new AtlassianDocumentFormat(List.of(
-                        new AtlassianDocumentFormat.Content(List.of(
-                                new AtlassianDocumentFormat.TextContent(newDescription))
-                            )
-                    )
-            );
-
-            ObjectMapper mapper = new ObjectMapper();
-            JsonNode commentToSend = mapper.valueToTree(Map.of("body", document));
+             JsonNode commentToSend = formatJiraComment(newDescription);
             log.info("Sending comment: {}", commentToSend);
 
-            ResponseEntity<JsonNode> commentOnIssueResponse = egressClient.commentOnIssue(invocationId, issueKey, commentToSend);
+            ResponseEntity<JsonNode> commentOnIssueResponse = egressClient.commentOnIssue(invocationId, issueKey, commentToSend, null);
             log.info("Received jira response: {}", commentOnIssueResponse);
         } else {
             log.info("No updates to the 'description' field found in the changelog - doing nothing");
         }
+    }
+
+    private void handleJiraAssignedIssue(String invocationId, ProductEventTrigger event) {
+        log.info("Processing event for jira issue assignment");
+
+        String issueKey = event.issue().key();
+        String assignee = event.issue().fields().assignee().accountId();
+
+        // Make a user impersonated call to post a comment as the assigned user
+        log.info("Commenting on issue as user: {}", assignee);
+        JsonNode commentToSend = formatJiraComment(String.format("Impersonating user: %s", assignee));
+        ResponseEntity<JsonNode> commentOnIssueResponse = egressClient.commentOnIssue(invocationId, issueKey, commentToSend, assignee);
+        log.info("Received jira response: {}", commentOnIssueResponse);
+    }
+
+    private JsonNode formatJiraComment(String description) {
+        ObjectMapper mapper = new ObjectMapper();
+        AtlassianDocumentFormat document =
+                new AtlassianDocumentFormat(List.of(
+                    new AtlassianDocumentFormat.Content(List.of(
+                            new AtlassianDocumentFormat.TextContent(description))
+                        )
+                )
+        );
+        return mapper.valueToTree(Map.of("body", document));
     }
 }

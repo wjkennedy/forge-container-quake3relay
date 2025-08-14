@@ -25,11 +25,16 @@ public class EgressClient {
     user
   }
 
-  private static String getAuthHeader(final String invocationId, final AuthType authType) {
-    if (authType == null) {
-      return String.format("Forge id=%s", invocationId);
+  private static String getAuthHeader(final String invocationId, final AuthType authType, @Nullable final String accountId) {
+    var authHeader = String.format("Forge id=%s", invocationId);
+    if (authType != null) {
+      authHeader += String.format(",as=%s", authType);
     }
-    return String.format("Forge as=%s,id=%s", authType, invocationId);
+    if (accountId != null) {
+      authHeader += String.format(",accountId=%s", accountId);
+    }
+
+    return authHeader;
   }
 
   private final RestClient restClient;
@@ -45,7 +50,7 @@ public class EgressClient {
 
   public ResponseEntity<JsonNode> getInvocationContext(final String invocationId) {
     var uri = URI.create(egressProxyUrl + "/invocation/context");
-    return sendRequest("Context request", invocationId, HttpMethod.GET, uri, null);
+    return sendRequest("Context request", invocationId, HttpMethod.GET, uri, null, null);
   }
 
   public ResponseEntity<JsonNode> sendRequest(
@@ -53,8 +58,9 @@ public class EgressClient {
           final String invocationId,
           final HttpMethod httpMethod,
           final URI uri,
-          final AuthType authType) {
-    return sendRequestWithBody(requestType, invocationId, httpMethod, uri, null, authType);
+          final AuthType authType,
+          @Nullable final String accountId) {
+    return sendRequestWithBody(requestType, invocationId, httpMethod, uri, null, authType, null);
   }
 
   public ResponseEntity<JsonNode> sendRequestWithBody(
@@ -63,11 +69,13 @@ public class EgressClient {
           final HttpMethod httpMethod,
           final URI uri,
           final Object body,
-          final AuthType authType) {
+          final AuthType authType,
+          @Nullable final String accountId
+          ) {
 
     var request = restClient.method(httpMethod)
             .uri(uri)
-            .header(ForgeEgressHeaders.FORGE_AUTHORIZATION, getAuthHeader(invocationId, authType));
+            .header(ForgeEgressHeaders.FORGE_AUTHORIZATION, getAuthHeader(invocationId, authType, accountId));
 
     Optional.ofNullable(body)
             .ifPresent(request::body);
@@ -85,16 +93,21 @@ public class EgressClient {
           final String apiPath) {
 
     var uri = URI.create(egressProxyUrl + "/proxy/" + apiPath);
-    return sendRequest("Egress request", invocationId, httpMethod, uri, null);
+    return sendRequest("Egress request", invocationId, httpMethod, uri, null, null);
   }
 
   public ResponseEntity<JsonNode> getAppUserInfo(final String invocationId) {
-    return sendJiraRequest(invocationId, AuthType.app, HttpMethod.GET, "rest/api/3/myself", null);
+    return sendJiraRequest(invocationId, AuthType.app, HttpMethod.GET, "rest/api/3/myself", null, null);
   }
 
-  public ResponseEntity<JsonNode> commentOnIssue(final String invocationId, String issueKey, Object body) {
+  public ResponseEntity<JsonNode> commentOnIssue(final String invocationId, String issueKey, Object body, @Nullable final String accountId) {
     String path = "/rest/api/3/issue/" + issueKey + "/comment";
-    return sendJiraRequest(invocationId, AuthType.app, HttpMethod.POST, path, body);
+
+    AuthType authType = AuthType.app;
+    if (accountId != null) {
+      authType = AuthType.user;
+    }
+    return sendJiraRequest(invocationId, authType, HttpMethod.POST, path, body, accountId);
   }
 
   public ResponseEntity<JsonNode> sendJiraRequest(
@@ -102,12 +115,13 @@ public class EgressClient {
           final AuthType authType,
           final HttpMethod httpMethod,
           final String apiPath,
-          @Nullable final Object body) {
+          @Nullable final Object body,
+          @Nullable final String accountId) {
 
     var uri = URI.create(egressProxyUrl + "/jira/" + apiPath);
     return Optional.ofNullable(body)
-            .map(bodyJson -> sendRequestWithBody("Jira request", invocationId, httpMethod, uri, bodyJson, authType))
-            .orElseGet(() -> sendRequest("Jira request", invocationId, httpMethod, uri, authType));
+            .map(bodyJson -> sendRequestWithBody("Jira request", invocationId, httpMethod, uri, bodyJson, authType, accountId))
+            .orElseGet(() -> sendRequest("Jira request", invocationId, httpMethod, uri, authType, accountId));
   }
 
   public ResponseEntity<JsonNode> publishRealtimeMessage(final String invocationId, final String channelName, final String payload) {
@@ -117,7 +131,7 @@ public class EgressClient {
             .put("name", channelName)
             .put("payload", payload);
 
-    return sendRequestWithBody("Publish realtime message", invocationId, HttpMethod.POST, uri, realtimeEvent, AuthType.app);
+    return sendRequestWithBody("Publish realtime message", invocationId, HttpMethod.POST, uri, realtimeEvent, AuthType.app, null);
   }
 
   public ResponseEntity<JsonNode> runSQLQuery(final String invocationId, final String query,
@@ -129,7 +143,7 @@ public class EgressClient {
             .set("params", objectMapper.valueToTree(params));
 
     var uri = URI.create(egressProxyUrl + "/forge/storage/sql/v1/execute");
-    return sendRequestWithBody("SQL Execute", invocationId, HttpMethod.POST, uri, queryExecutionRequest, AuthType.app);
+    return sendRequestWithBody("SQL Execute", invocationId, HttpMethod.POST, uri, queryExecutionRequest, AuthType.app, null);
   }
 
   public ResponseEntity<JsonNode> setValueToKvs(final String invocationId, final String key, final String value) {
@@ -139,7 +153,7 @@ public class EgressClient {
             .put("value", value);
 
     var uri = URI.create(egressProxyUrl + "/forge/storage/kvs/v1/set");
-    return sendRequestWithBody("Set KVS request", invocationId, HttpMethod.POST, uri, objectNodeSet, null);
+    return sendRequestWithBody("Set KVS request", invocationId, HttpMethod.POST, uri, objectNodeSet, null, null);
   }
 
   public ResponseEntity<JsonNode> getValueFromKvs(final String invocationId, final String key) {
@@ -148,7 +162,7 @@ public class EgressClient {
                     .put("key", key);
 
     var uri = URI.create(egressProxyUrl + "/forge/storage/kvs/v1/get");
-    return sendRequestWithBody("Get KVS request", invocationId, HttpMethod.POST, uri, objectNodeGet, null);
+    return sendRequestWithBody("Get KVS request", invocationId, HttpMethod.POST, uri, objectNodeGet, null, null);
   }
 
   /**
@@ -191,7 +205,7 @@ public class EgressClient {
     data.check.forEach(checkOperation -> checkArray.add(objectMapper.valueToTree(checkOperation)));
 
     var uri = URI.create(egressProxyUrl + "/forge/storage/kvs/v1/transaction");
-    return sendRequestWithBody("Execute KVS transaction", invocationId, HttpMethod.POST, uri, transactionRequest, null);
+    return sendRequestWithBody("Execute KVS transaction", invocationId, HttpMethod.POST, uri, transactionRequest, null, null);
   }
 
   /**
@@ -216,6 +230,6 @@ public class EgressClient {
     events.forEach(event -> eventsArray.add(objectMapper.valueToTree(event)));
 
     var uri = URI.create(egressProxyUrl + "/atlassian/forge/events/v1/async-events");
-    return sendRequestWithBody("Queue Async Event", invocationId, HttpMethod.POST, uri, eventRequest, AuthType.app);
+    return sendRequestWithBody("Queue Async Event", invocationId, HttpMethod.POST, uri, eventRequest, AuthType.app, null);
   }
 }

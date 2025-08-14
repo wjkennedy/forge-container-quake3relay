@@ -5,7 +5,12 @@
 
     <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
         <encoder class="net.logstash.logback.encoder.LogstashEncoder">
-            <includeMdcKeyName>invocationId</includeMdcKeyName>
+            <includeMdcKeyName>forge.invocation</includeMdcKeyName>
+            <fieldNames>
+                <timestamp>ts</timestamp>
+                <message>msg</message>
+            </fieldNames>
+            <timestampPattern>[UNIX_TIMESTAMP_AS_NUMBER]</timestampPattern>
         </encoder>
     </appender>
 

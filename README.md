@@ -122,9 +122,16 @@ Once deployed, you will need to install the app on your site's Jira context. See
 
 ## Test service invocation <a id="test-service-invocation"></a>
 
-This app has a prepared webtrigger named `http-webtrigger` which can invoke `java-service`. It demonstrates various features of the Forge platform; the implementation can be found in [WebTriggerEndpoint.java](services/java-spring-server/src/main/java/com/atlassian/container/WebTriggerEndpoint.java).
+This app has multiple webtriggers which can invoke `java-service` and demonstrate various features of the Forge platform; the implementation can be found in [WebTriggerEndpoint.java](services/java-spring-server/src/main/java/com/atlassian/container/WebTriggerEndpoint.java).
 
-To try this, create a webtrigger URL for `http-webtrigger` (see [Command: webtrigger](https://developer.atlassian.com/platform/forge/cli-reference/webtrigger/) for related details) on your site.
+The available webtriggers are as follows:
+| Name           | Description                                                                                                   | Success response      |
+| -------------- | ------------------------------------------------------------------------------------------------------------- | --------------------- |
+| `http-webtrigger`   | Makes various egress requests: to fetch invocation context, to an external site, and to Jira                  | `{"message": "Hello Forge Container World" }` |
+| `sql-webtrigger`    | Queries a database which is set up by an hourly scheduled trigger         | `{"fetchedBook": "<integer>"}`          |
+| `kvs-webtrigger` | Performs a series of KVS operations. Operations can be passed into the body of requests to this webtrigger in the form `{"set": [{"key": "", "value": ""}, ..], "delete": [{"key": ""}, ..], "check": [{"key": ""}, ...]}` | `{"message": "KVS transaction performed successfully" } `              |
+
+To call any of these webtriggers, create a webtrigger URL on your site (see [Command: webtrigger](https://developer.atlassian.com/platform/forge/cli-reference/webtrigger/)) for related details.
 
 Once you have your webtrigger URL, invoke it via `curl` to return a message from `java-service`:
 
@@ -132,17 +139,17 @@ Once you have your webtrigger URL, invoke it via `curl` to return a message from
 curl -X POST "$WEB_TRIGGER_URL"
 ```
 
-If successful this should return:
+You can pass a request body to the webtrigger by calling:
 
-```json
-{ "message": "Hello Forge Container World" }
+```bash
+curl -X POST "$WEB_TRIGGER_URL" -d '{"<key>": "<value>", ...}'
 ```
 
-This message verifies that the `java-service` instance hosted on Forge Containers received and responded to the webtrigger invocation.
+If the listed success response is returned, the `java-service` instance hosted on Forge Containers received and responded to the webtrigger invocation.
 
 #### Troubleshooting
 
-If the request is **unsuccessful** with 424 Failed Dependency, it could be related to the use of Forge SQL in the webtrigger implementation.
+If the `sql-webtrigger` returns **unsuccessful** with 424 Failed Dependency, it could be related to the use of Forge SQL in the webtrigger implementation.
 
 The `sql-webtrigger` queries a database which is set up automatically using an hourly scheduled trigger. If you call the `sql-webtrigger` before the database set up has occurred, the request will fail. To mitigate this, you can run the migration manually by creating and requesting the webtrigger `runMigration`.
 
