@@ -1,7 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import ForgeReconciler, { Text } from '@forge/react';
 import { invokeService, __realtime } from '@forge/bridge';
+import InvokeServicePanelComponent from "./InvokeServicePanelComponent";
 
+/*
+   In this example, we directly invoke a container service through the @forge/bridge package.
+ */
 const App = () => {
     const [data, setData] = useState(null);
     const [realtimeData, setRealtimeData] = useState(null);
@@ -15,7 +19,7 @@ const App = () => {
                 path: '/invoke-service?exampleStr=jira&exampleInt=123',
                 body: JSON.stringify(
                     {
-                        'message': 'Hello from jira issue panel'
+                        'message': 'Hello from forge app frontend'
                     }
                 ),
                 headers: {
@@ -43,28 +47,14 @@ const App = () => {
           subscribeToTopic();
     }, []);
 
-    if (!data) {
-        return (
-            <>
-                <Text size="large">Data received from invokeService request</Text>
-                <Text>Loading...</Text>
-            </>
-        );
-    } else {
-        return (
-            <>
-                <Text size="large">Realtime event received: {JSON.stringify(realtimeData, null, 2)}</Text>
-                <Text size="large">Data received from invokeService request</Text>
-                <Text>status: {data?.status}</Text>
-                <Text>headers: {JSON.stringify(data?.headers, null, 2)}</Text>
-                <Text>body.message: {data?.body?.message}</Text>
-                <Text>body.requestDetails.headers: {JSON.stringify(data?.body?.requestDetails?.headers, null, 2)}</Text>
-                <Text>body.requestDetails.body: {JSON.stringify(data?.body?.requestDetails?.body, null, 2)}</Text>
-                <Text>body.requestDetails.queryParameters: {JSON.stringify(data?.body?.requestDetails?.queryParameters, null, 2)}</Text>
-            </>
-        );
-    }
 
+
+    return (
+        <>
+            <Text>Realtime event received: {JSON.stringify(realtimeData, null, 2)}</Text>
+            <InvokeServicePanelComponent data={data} />
+        </>
+    )
 };
 
 ForgeReconciler.render(

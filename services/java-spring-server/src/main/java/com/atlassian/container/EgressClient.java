@@ -96,8 +96,8 @@ public class EgressClient {
     return sendRequest("Egress request", invocationId, httpMethod, uri, null, null);
   }
 
-  public ResponseEntity<JsonNode> getAppUserInfo(final String invocationId) {
-    return sendJiraRequest(invocationId, AuthType.app, HttpMethod.GET, "rest/api/3/myself", null, null);
+  public ResponseEntity<JsonNode> getCurrentUser(final String invocationId, AuthType authType) {
+    return sendJiraRequest(invocationId, authType, HttpMethod.GET, "rest/api/3/myself", null, null);
   }
 
   public ResponseEntity<JsonNode> commentOnIssue(final String invocationId, String issueKey, Object body, @Nullable final String accountId) {

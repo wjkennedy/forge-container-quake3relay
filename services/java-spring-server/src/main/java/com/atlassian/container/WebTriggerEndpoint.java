@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.annotation.ExceptionHandler;
+import com.atlassian.container.EgressClient.AuthType;
 
 import java.util.Map;
 import java.util.Optional;
@@ -51,7 +52,7 @@ public class WebTriggerEndpoint {
         validateEgressResponse(egressResponse, "https://" + egressUrl);
 
         //Make Jira Request
-        log.info("Received Jira response: {}", egressClient.getAppUserInfo(invocationId));
+        log.info("Received Jira response: {}", egressClient.getCurrentUser(invocationId, AuthType.app));
 
         return singletonMap("message", "Hello Forge Container World");
     }

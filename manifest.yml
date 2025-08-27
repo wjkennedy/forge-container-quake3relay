@@ -20,6 +20,13 @@ modules:
       render: native
       title: jira-issue-panel-container
       icon: https://developer.atlassian.com/platform/forge/images/icons/issue-panel-icon.svg
+    - key: panel-with-resolver-fn
+      resource: panel-resource
+      resolver:
+        function: panel-resolver-fn
+      render: native
+      title: panel-with-resolver-function
+      icon: https://developer.atlassian.com/platform/forge/images/icons/issue-panel-icon.svg
   webtrigger:
     - key: webtrigger-realtime
       endpoint: webtrigger-ep-realtime
@@ -40,6 +47,8 @@ modules:
   function:
     - key: runMigration
       handler: db.runMigration
+    - key: panel-resolver-fn
+      handler: panel.handler
   trigger:
     - key: container-product-trigger-event
       endpoint: product-event-trigger-ep
@@ -49,7 +58,7 @@ modules:
   scheduledTrigger:
     - key: container-scheduled-trigger-event
       endpoint: scheduled-trigger-ep
-      interval: hour
+      interval: fiveMinute
     - key: db-migration-trigger
       function: runMigration
       interval: hour
@@ -122,6 +131,8 @@ permissions:
 resources:
   - key: main
     path: src/frontend/index.jsx
+  - key: panel-resource
+    path: src/frontend/panel-with-backend-fn.jsx
 
 app:
   runtime:
