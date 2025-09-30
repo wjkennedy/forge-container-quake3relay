@@ -45,6 +45,7 @@ public class InvokeServiceEndpoint {
         log.info("Received body: {}", body);
         log.info("Received query parameters: exampleStr={}, exampleInt={}", exampleStr, exampleInt);
         log.info("Read forge environment variable FORGE_REFERENCE_APP_KEY={}", System.getenv("FORGE_REFERENCE_APP_KEY"));
+        log.info("Read forge encrypted environment variable FORGE_APP_SECRET, success={}", "my-app-secret".equals(System.getenv("FORGE_APP_SECRET")));
 
         // set a custom header on the response
         HttpHeaders responseHeaders = new HttpHeaders();

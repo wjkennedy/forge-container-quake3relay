@@ -110,10 +110,11 @@ docker push "$REPOSITORY_URI:$TAG"
 
 ## Deploy & install Forge app <a id="deploy--install-forge-app"></a>
 
-Unencrypted forge [environment variables](https://developer.atlassian.com/platform/forge/cli-reference/variables/) will become accessible by forge app code after running `forge deploy`. To test this, first set a forge environment variable which will then be visible when logged inside of [InvokeServiceEndpoint.java](services/java-spring-server/src/main/java/com/atlassian/container/InvokeServiceEndpoint.java).
+Forge [environment variables](https://developer.atlassian.com/platform/forge/cli-reference/variables/) will become accessible by forge app code after running `forge deploy`. To test this, first set a forge environment variable which will then be visible when logged inside of [InvokeServiceEndpoint.java](services/java-spring-server/src/main/java/com/atlassian/container/InvokeServiceEndpoint.java).
 
 ```bash
 forge variables set FORGE_REFERENCE_APP_KEY FORGE_REFERENCE_APP_VALUE
+forge variables set --encrypt FORGE_APP_SECRET 'my-app-secret'
 ```
 
 Since this capability is currently in EAP, you'll only be able to deploy your app in a development or custom [environment](https://developer.atlassian.com/platform/forge/environments-and-versions/#environments). See [Command: deploy](https://developer.atlassian.com/platform/forge/cli-reference/deploy/) for related details.
@@ -167,6 +168,9 @@ The platform sidecar uses several environment variables to connect to your app a
 - `APP_ID`: your unique app ID, created earlier through forge register.
 - `ENV_ID`: the ID of the environment where your app is currently deployed; to view all environments (and corresponding IDs), use `forge environments list`.
 - `IS_LOCAL_DEV`: set this to `true` to let Forge make the necessary adjustments for calls coming from a local sidecar instance.
+
+> **Note**: When multiple development environments are created for the same app, make sure to specify the environment you want to tunnel, i.e. `forge tunnel -e <environment-name>`. Not setting this will lead to Forge tunnelling to the default environment configured for your CLI, which may not be the one you are interested in.
+Alternatively, use `forge settings set default-environment <environment-name>` to set the default environment for the CLI.
 
 Once you're ready to test your service, build its image locally and launch it in the background:
 

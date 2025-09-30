@@ -3,9 +3,9 @@ import { invokeService } from "@forge/api";
 
 const resolver = new Resolver();
 
-/*
-   This is a backend resolver, invoked from the frontend, which must return JSON.
-   In this example, we further invoke a container service through the @forge/api package.
+/**
+ * This is a backend resolver, invoked from the frontend, which must return JSON.
+ * In this example, we further invoke a container service through the @forge/api package.
  */
 resolver.define('invoke-service-resolver', async () => {
     console.log("Calling invokeService...")
@@ -15,7 +15,7 @@ resolver.define('invoke-service-resolver', async () => {
         path: '/invoke-service?exampleStr=jira&exampleInt=123',
         body: JSON.stringify(
             {
-                'message': 'Hello from forge app backend'
+                'message': 'Hello from forge resolver function - invokeService called in app backend'
             }
         ),
         headers: {
