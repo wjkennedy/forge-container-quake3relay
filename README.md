@@ -126,6 +126,7 @@ Once deployed, you will need to install the app on your site's Jira context. See
 This app has multiple webtriggers which can invoke `java-service` and demonstrate various features of the Forge platform; the implementation can be found in [WebTriggerEndpoint.java](services/java-spring-server/src/main/java/com/atlassian/container/WebTriggerEndpoint.java).
 
 The available webtriggers are as follows:
+
 | Name           | Description                                                                                                   | Success response      |
 | -------------- | ------------------------------------------------------------------------------------------------------------- | --------------------- |
 | `http-webtrigger`   | Makes various egress requests: to fetch invocation context, to an external site, and to Jira                  | `{"message": "Hello Forge Container World" }` |
