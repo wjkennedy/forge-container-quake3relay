@@ -12,4 +12,4 @@ WORKDIR /opt/service
 COPY --from=builder /workspace/app/build/libs/java-spring-server-*.jar /opt/service/service.jar
 
 EXPOSE 8080
-CMD ["java", "-jar", "/opt/service/service.jar"]
+CMD ["java", "-XX:InitialRAMPercentage=15", "-XX:MaxRAMPercentage=35", "-jar", "/opt/service/service.jar"]

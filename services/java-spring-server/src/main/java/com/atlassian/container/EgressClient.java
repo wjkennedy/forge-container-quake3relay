@@ -208,6 +208,12 @@ public class EgressClient {
     return sendRequestWithBody("Execute KVS transaction", invocationId, HttpMethod.POST, uri, transactionRequest, null, null);
   }
 
+  public ResponseEntity<JsonNode> executeDynamicModuleRequest(final String invocationId, HttpMethod httpMethod, final String key, final String queryParams, final JsonNode body) {
+    var uri = URI.create(egressProxyUrl + "/atlassian/forge/installation/v1/dynamic/module" + key + queryParams);
+    return sendRequestWithBody("Querying dynamic modules endpoint", invocationId, httpMethod, uri, body,
+        AuthType.app, null);
+  }
+
   /**
    * A Forge AsyncEvent is a JSON object with the following structure:
    * {

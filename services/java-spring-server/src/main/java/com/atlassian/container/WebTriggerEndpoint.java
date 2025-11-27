@@ -112,6 +112,62 @@ public class WebTriggerEndpoint {
 
         return singletonMap("message", "KVS transaction performed successfully");
     }
+
+    /**
+     * Call the dynamic modules API. The method, alongside the key and body (depending on the API being called)
+     * will need to be passed in via the webtrigger request body. See the following examples on how to call this webtrigger.
+     * 1. Creating a dynamic module (POST):
+     * curl -X POST <webtrigger URL> -d '{
+     *   "method": "POST",
+     *   "body": {
+     *     "key": "test",
+     *     "type": "trigger",
+     *     "data": {
+     *       "key": "test-trigger-key",
+     *       "function": "handler",
+     *       "events": [ "avi:jira:created:issue" ]
+     *     }
+     *   }
+     * }'
+     *
+     * 2. Querying a dynamic module (GET). The queryParams field is optional:
+     * curl -X GET <webtrigger URL> -d '{
+     *   "method": "GET",
+     *   "key": "test",
+     * }'
+     * 
+     * curl -X GET <webtrigger URL> -d '{
+     *   "method": "GET",
+     *   "queryParams": "limit=10&nextPageToken=next-page-token"
+     * }'
+     * 
+     * The other methods follow the same pattern.
+     */
+    @ResponseBody
+    @PostMapping("/dynamic-modules")
+    public Map<String, String> dynamicModules(@RequestHeader(INVOCATION_ID) String invocationId, @RequestBody JsonNode requestBody) {
+        final String httpMethodString = requestBody.hasNonNull("method") ? requestBody.get("method").asText() : "UNKNOWN";
+        final HttpMethod httpMethod = parseHttpMethod(httpMethodString);
+        final String queryParams = requestBody.hasNonNull("queryParams") ? "?" + requestBody.get("queryParams").asText() : "";
+        final String key = requestBody.hasNonNull("key") ? "/" + requestBody.get("key").asText(): "";
+        final JsonNode body = requestBody.hasNonNull("body") ? requestBody.get("body") : null;
+
+        log.info("Invoking dynamic modules API with invocationId = {}, method={}, key={}, body={}",
+                invocationId, httpMethod, key, body);
+        final ResponseEntity<JsonNode> dynamicModuleEgressResponse = egressClient.executeDynamicModuleRequest(
+                invocationId, httpMethod, key, queryParams, body);
+        log.info("Received dynamic module response: {}", dynamicModuleEgressResponse);
+
+        return singletonMap("message",
+                String.format("Dynamic modules request completed successfully with response code: %s", dynamicModuleEgressResponse.getStatusCode()));
+    }
+
+    private HttpMethod parseHttpMethod(final String method) {
+        if (method == null || !method.matches("(?i)GET|POST|PUT|DELETE|PATCH|OPTIONS|HEAD|TRACE")) {
+            throw new IllegalStateException("Invalid HTTP method: " + method);
+        }
+        return HttpMethod.valueOf(method.toUpperCase());
+    }
     
     private void validateEgressResponse(final ResponseEntity<JsonNode> response, final String expectedUrl) {
         final String requestedUrl = Optional.ofNullable(response.getBody())

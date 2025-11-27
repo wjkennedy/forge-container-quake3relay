@@ -2,6 +2,16 @@ services:
   - key: java-service
     containers:
       - key: java-service
+        tunnel:
+          docker:
+            build:
+              context: ./services/java-spring-server
+              dockerfile: Dockerfile
+            image: java-service:${TAG}
+            ports:
+              - "8080:8080"
+            environment:
+              - CUSTOM_TUNNEL_ENV_VAR=custom_tunnel_env_var
         tag: ${TAG}
         health:
           type: http
@@ -35,7 +45,9 @@ modules:
     - key: sql-webtrigger
       endpoint: webtrigger-sql
     - key: kvs-webtrigger
-      endpoint: webtrigger-kvs-transaction  
+      endpoint: webtrigger-kvs-transaction
+    - key: dynamic-modules-webtrigger
+      endpoint: webtrigger-dynamic-modules
     - key: run-migration
       function: runMigration
     - key: latest-scheduled-trigger-time
@@ -83,11 +95,15 @@ modules:
     - key: webtrigger-sql
       service: java-service
       route:
-        path: /webtrigger/sql 
+        path: /webtrigger/sql
     - key: webtrigger-kvs-transaction
       service: java-service
       route:
         path: /webtrigger/kvs-transaction
+    - key: webtrigger-dynamic-modules
+      service: java-service
+      route:
+        path: /webtrigger/dynamic-modules
     - key: async-event-publish-ep
       service: java-service
       route:

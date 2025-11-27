@@ -108,7 +108,7 @@ docker push "$REPOSITORY_URI:$TAG"
 
 > **NOTE:** Forge Container image tags are immutable so you will need to change the value of `TAG` to push additional changes.
 
-## Deploy & install Forge app <a id="deploy--install-forge-app"></a>
+## Deploy & Install Forge app <a id="deploy--install-forge-app"></a>
 
 Forge [environment variables](https://developer.atlassian.com/platform/forge/cli-reference/variables/) will become accessible by forge app code after running `forge deploy`. To test this, first set a forge environment variable which will then be visible when logged inside of [InvokeServiceEndpoint.java](services/java-spring-server/src/main/java/com/atlassian/container/InvokeServiceEndpoint.java).
 
@@ -129,9 +129,9 @@ The available webtriggers are as follows:
 
 | Name           | Description                                                                                                   | Success response      |
 | -------------- | ------------------------------------------------------------------------------------------------------------- | --------------------- |
-| `http-webtrigger`   | Makes various egress requests: to fetch invocation context, to an external site, and to Jira                  | `{"message": "Hello Forge Container World" }` |
-| `sql-webtrigger`    | Queries a database which is set up by an hourly scheduled trigger         | `{"fetchedBook": "<integer>"}`          |
-| `kvs-webtrigger` | Performs a series of KVS operations. Operations can be passed into the body of requests to this webtrigger in the form `{"set": [{"key": "", "value": ""}, ..], "delete": [{"key": ""}, ..], "check": [{"key": ""}, ...]}` | `{"message": "KVS transaction performed successfully" } `              |
+| `http-webtrigger` | Makes various egress requests: to fetch invocation context, to an external site, and to Jira | `{"message": "Hello Forge Container World" }` |
+| `sql-webtrigger` | Queries a database which is set up by an hourly scheduled trigger | `{"fetchedBook": "<integer>"}` |
+| `kvs-webtrigger` | Performs a series of KVS operations. Operations can be passed into the body of requests to this webtrigger in the form `{"set": [{"key": "", "value": ""}, ..], "delete": [{"key": ""}, ..], "check": [{"key": ""}, ...]}` | `{"message": "KVS transaction performed successfully" } ` |
 
 To call any of these webtriggers, create a webtrigger URL on your site (see [Command: webtrigger](https://developer.atlassian.com/platform/forge/cli-reference/webtrigger/)) for related details.
 
@@ -157,7 +157,26 @@ The `sql-webtrigger` queries a database which is set up automatically using an h
 
 ### Test service invocation locally <a id="test-service-invocation-locally"></a>
 
-You can use `forge tunnel` to test your containerised service locally before uploading its image to Forge Containers. To do this, you'll need to first download the Forge Containers platform sidecar using `docker pull` (you may need to re-authenticate the Docker CLI first):
+There are two supported methods for running your containerised service(s) locally before uploading their images to Forge Containers.
+
+> **Important**: These two methods are **not** compatible with each other and should not be mixed. Choose either Method 1 or Method 2.
+
+#### Method 1: Defining container tunnel config in the manifest
+
+This is the default method for this reference app. Example config which should be added to each container definition is now visible in the manifest underneath the `java-service` container.
+
+Each container which has `tunnel` config defined will automatically have a docker container started up based on that config after running `forge tunnel`. If a container does not have the relevant config defined, it will not automatically start up and any invocation sent to this container will fail. If you don't want start up the container automatically, you can choose not to define this config for the given container.
+
+> **Note 1**: This config follows Docker Compose syntax and semantics, and it closely matches the service config in `docker-compose.yml` \
+> **Note 2**: The `environment` field in this config is optional.
+
+To test your containerised service locally using this method, run `forge tunnel [-e <env>]`.
+
+#### Method 2: Manually starting up docker containers without adding config to the manifest
+
+This is the alternate method for this reference app which Method 1 aims to automate.
+
+First, you'll need to download the Forge Containers platform sidecar using `docker pull` (you may need to re-authenticate the Docker CLI first):
 
 ```bash
 forge containers docker-login
@@ -171,7 +190,7 @@ The platform sidecar uses several environment variables to connect to your app a
 - `IS_LOCAL_DEV`: set this to `true` to let Forge make the necessary adjustments for calls coming from a local sidecar instance.
 
 > **Note**: When multiple development environments are created for the same app, make sure to specify the environment you want to tunnel, i.e. `forge tunnel -e <environment-name>`. Not setting this will lead to Forge tunnelling to the default environment configured for your CLI, which may not be the one you are interested in.
-Alternatively, use `forge settings set default-environment <environment-name>` to set the default environment for the CLI.
+> Alternatively, use `forge settings set default-environment <environment-name>` to set the default environment for the CLI.
 
 Once you're ready to test your service, build its image locally and launch it in the background:
 
