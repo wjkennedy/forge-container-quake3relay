@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
-import ForgeReconciler, { Text } from '@forge/react';
-import { invokeService, __realtime } from '@forge/bridge';
+import React, { useEffect, useState } from "react";
+import ForgeReconciler, { Text } from "@forge/react";
+import { invokeService, realtime } from "@forge/bridge";
 import InvokeServicePanelComponent from "./InvokeServicePanelComponent";
 
 /*
@@ -9,56 +9,148 @@ import InvokeServicePanelComponent from "./InvokeServicePanelComponent";
 const App = () => {
     const [data, setData] = useState(null);
     const [realtimeData, setRealtimeData] = useState(null);
+    const [globalRealtimeData, setGlobalRealtimeData] = useState(null);
+    const [globalTokenRealtimeData, setGlobalTokenRealtimeData] =
+        useState(null);
 
     useEffect(() => {
-        console.log("Calling POST /invoke-service ...")
+        console.log("Calling POST /invoke-service ...");
 
         const fetchData = async () => {
             const data = await invokeService({
-                method: 'POST',
-                path: '/invoke-service?exampleStr=jira&exampleInt=123',
-                body: JSON.stringify(
-                    {
-                        'message': 'Hello from forge app frontend'
-                    }
-                ),
+                method: "POST",
+                path: "/invoke-service?exampleStr=jira&exampleInt=123",
+                body: JSON.stringify({
+                    message: "Hello from forge app frontend",
+                }),
                 headers: {
-                    'x-custom-request-header': 'x-custom-request-header-value'
-                }
+                    "x-custom-request-header": "x-custom-request-header-value",
+                },
             });
-            console.log(`POST /invoke-service response: ${JSON.stringify(data, null, 2)}`)
+            console.log(`POST /invoke-service response: ${JSON.stringify(data, null, 2)}`);
             setData(data);
-        }
+        };
 
-        fetchData()
+        fetchData();
     }, []);
 
+    // This subscribes to a channel
+    // A message will be sent to this channel using invokeService so that it comes from the same context.
     useEffect(() => {
-        // This subscribes to a channel called "forge-container-realtime-channel", the "webtrigger-realtime" endpoint will publish to this channel.
-        const subscribeToTopic = async () => {
+        const channelName = "forge-container-realtime-channel";
+        const subscribeToChannel = async () => {
             const onEvent = (payload) => {
-                console.log('Received event with payload...: ', payload);
+                console.log("Received event with payload...: ", payload);
                 setRealtimeData(payload);
             };
-            const subscription = await __realtime.subscribe('forge-container-realtime-channel', onEvent);
-            console.log('Subscribed to channel: forge-container-realtime-channel', subscription);
-        }
+            const subscription = await realtime.subscribe(channelName, onEvent);
+            console.log(`Subscribed to channel: ${channelName}`, subscription);
 
-          subscribeToTopic();
+            // Wait a moment to ensure subscription is established
+            await new Promise((resolve) => setTimeout(resolve, 2000));
+
+            // Publish a message to this channel via invoke service
+            console.log("Invoking service to publish realtime message...");
+            const resp = await invokeService({
+                method: "POST",
+                path: "/publish-realtime-message",
+                body: JSON.stringify({
+                    channelName: channelName,
+                }),
+                headers: {
+                    "x-custom-request-header": "x-custom-request-header-value",
+                    "Content-Type": "application/json",
+                },
+            });
+            console.log("Publish realtime message response: ", resp);
+        };
+
+        subscribeToChannel();
     }, []);
 
+    // This subscribes to a global channel
+    // the 'webtrigger/realtime/global' endpoint will publish to this channel.
+    useEffect(() => {
+        const channelName = "forge-container-global-realtime-channel";
+        const subscribeToGlobalChannel = async () => {
+            const onEvent = (payload) => {
+                console.log("Received event with payload...: ", payload);
+                setGlobalRealtimeData(payload);
+            };
+            const subscription = await realtime.subscribeGlobal(
+                channelName,
+                onEvent
+            );
+            console.log(`Subscribed to channel: ${channelName}`, subscription);
+        };
 
+        subscribeToGlobalChannel();
+    }, []);
+
+    // This subscribes to a global channel with a token
+    // The 'webtrigger/realtime/token' endpoint will publish to this channel.
+    useEffect(() => {
+        const channelName = "forge-container-global-token-realtime-channel";
+        const subscribeToGlobalTokenChannel = async () => {
+            const onEvent = (payload) => {
+                console.log(
+                    "Received tokened event with payload...: ",
+                    payload
+                );
+                setGlobalTokenRealtimeData(payload);
+            };
+
+            console.log("Requesting a signed realtime token from backend...");
+            const realtimeTokenResponse = await invokeService({
+                method: "POST",
+                path: "/sign-realtime-token",
+                body: JSON.stringify({
+                    channelName: channelName,
+                    claims: {
+                        allowedUsers: ["accountId-1", "accountId-2"],
+                    },
+                }),
+                headers: {
+                    "x-custom-request-header": "x-custom-request-header-value",
+                    "Content-Type": "application/json",
+                },
+            });
+
+            const signedRealtimeToken = realtimeTokenResponse.body.signedRealtimeToken;
+            const tokenPreview = `${signedRealtimeToken.substring(0, 6)}...${signedRealtimeToken.substring(
+                signedRealtimeToken.length - 6
+            )}`;
+            console.log("Received signed realtime token: ", tokenPreview);
+
+            const subscription = await realtime.subscribeGlobal(
+                channelName,
+                onEvent,
+                { token: signedRealtimeToken }
+            );
+            console.log(`Subscribed to channel: ${channelName}`, subscription);
+        };
+
+        subscribeToGlobalTokenChannel();
+    }, []);
 
     return (
         <>
-            <Text>Realtime event received: {JSON.stringify(realtimeData, null, 2)}</Text>
+            <Text>
+                Realtime event received: {JSON.stringify(realtimeData, null, 2)}
+            </Text>
+            <Text>
+                Global realtime event received: {JSON.stringify(globalRealtimeData, null, 2)}
+            </Text>
+            <Text>
+                Global tokened realtime event received: {JSON.stringify(globalTokenRealtimeData, null, 2)}
+            </Text>
             <InvokeServicePanelComponent data={data} />
         </>
-    )
+    );
 };
 
 ForgeReconciler.render(
     <React.StrictMode>
-        <App/>
+        <App />
     </React.StrictMode>
 );

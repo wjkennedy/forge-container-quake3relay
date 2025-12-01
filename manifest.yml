@@ -5,9 +5,9 @@ services:
         tunnel:
           docker:
             build:
-              context: ./services/java-spring-server
+              context: ./services/java-spring-server # This should be an absolute path to the Docker build context
               dockerfile: Dockerfile
-            image: java-service:${TAG}
+            image: java-service:${TAG} # If the image doesn't exist, it will be built based on the build context then started up
             ports:
               - "8080:8080"
             environment:
@@ -38,8 +38,10 @@ modules:
       title: panel-with-resolver-function
       icon: https://developer.atlassian.com/platform/forge/images/icons/issue-panel-icon.svg
   webtrigger:
-    - key: webtrigger-realtime
-      endpoint: webtrigger-ep-realtime
+    - key: webtrigger-realtime-global
+      endpoint: webtrigger-ep-realtime-global
+    - key: webtrigger-realtime-token
+      endpoint: webtrigger-ep-realtime-token
     - key: http-webtrigger
       endpoint: webtrigger-http
     - key: sql-webtrigger
@@ -80,10 +82,6 @@ modules:
       endpoint: async-event-handle-ep
       crossVersion: true
   endpoint:
-    - key: webtrigger-ep-realtime
-      service: java-service
-      route:
-        path: /webtrigger/realtime
     - key: webtrigger-ep
       service: java-service
       route:
@@ -128,6 +126,14 @@ modules:
       service: java-service
       route:
         path: /latest-scheduled-trigger-time
+    - key: webtrigger-ep-realtime-global
+      service: java-service
+      route:
+        path: /webtrigger/realtime/global
+    - key: webtrigger-ep-realtime-token
+      service: java-service
+      route:
+        path: /webtrigger/realtime/token
     - key: invoke-service-frontend-ep
       service: java-service
 
@@ -135,6 +141,7 @@ permissions:
   scopes:
     read:jira-user: {}
     read:jira-work: {}
+    read:app-global-channel:realtime: {}
     write:jira-work:
       allowImpersonation: true
     storage:app: {}

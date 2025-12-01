@@ -101,12 +101,8 @@ public class EgressClient {
   }
 
   public ResponseEntity<JsonNode> commentOnIssue(final String invocationId, String issueKey, Object body, @Nullable final String accountId) {
-    String path = "/rest/api/3/issue/" + issueKey + "/comment";
-
-    AuthType authType = AuthType.app;
-    if (accountId != null) {
-      authType = AuthType.user;
-    }
+    final String path = "/rest/api/3/issue/" + issueKey + "/comment";
+    final AuthType authType = (accountId != null) ? AuthType.user : AuthType.app;
     return sendJiraRequest(invocationId, authType, HttpMethod.POST, path, body, accountId);
   }
 
@@ -124,14 +120,49 @@ public class EgressClient {
             .orElseGet(() -> sendRequest("Jira request", invocationId, httpMethod, uri, authType, accountId));
   }
 
-  public ResponseEntity<JsonNode> publishRealtimeMessage(final String invocationId, final String channelName, final String payload) {
-    var uri = URI.create(egressProxyUrl + "/forge/realtime/publish");
+  /**
+   * This will publish a realtime message to a specified channel. This does not publish to a global channel.
+   */
+  public ResponseEntity<JsonNode> publishRealtimeMessage(final String invocationId, final String channelName,
+      final String payload, @Nullable final String token, @Nullable final Boolean isGlobal) {
+    final String globalString = isGlobal != null && isGlobal ? "/global" : "";
+    var uri = URI.create(egressProxyUrl + "/forge/realtime/v1/publish" + globalString);
 
     final ObjectNode realtimeEvent = objectMapper.createObjectNode()
             .put("name", channelName)
             .put("payload", payload);
 
-    return sendRequestWithBody("Publish realtime message", invocationId, HttpMethod.POST, uri, realtimeEvent, AuthType.app, null);
+    if (token != null) {
+      final ObjectNode options = objectMapper.createObjectNode();
+      options.put("token", token);
+      realtimeEvent.set("options", options);
+    }
+
+    return sendRequestWithBody("Publish realtime message", invocationId, HttpMethod.POST, uri, realtimeEvent,
+        AuthType.app, null);
+  }
+
+  /**
+   * This will publish a realtime message to a specified global channel.
+   */
+  public ResponseEntity<JsonNode> publishGlobalRealtimeMessage(final String invocationId, final String channelName,
+      final String payload, @Nullable final String token) {
+    return publishRealtimeMessage(invocationId, channelName, payload, token, true);
+  }
+
+  /**
+   * This will sign a realtime token for a specified channel with the provided claims.
+   */
+  public ResponseEntity<JsonNode> signRealtimeToken(final String invocationId, final String channelName,
+      ObjectNode claims) {
+    var uri = URI.create(egressProxyUrl + "/forge/realtime/v1/token");
+
+    final ObjectNode realtimeEvent = objectMapper.createObjectNode()
+        .put("channelName", channelName)
+        .set("claims", claims);
+
+    return sendRequestWithBody("Sign realtime channel", invocationId, HttpMethod.POST, uri, realtimeEvent,
+        AuthType.app, null);
   }
 
   public ResponseEntity<JsonNode> runSQLQuery(final String invocationId, final String query,
