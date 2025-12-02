@@ -22,12 +22,12 @@ This reference application for Jira demonstrates the basics of using Forge Conta
 
 This project uses several environment variables that need to be configured:
 
-| Variable         | Description                                                                                                   | Required          |
-|------------------|---------------------------------------------------------------------------------------------------------------|-------------------|
-| `APP_ID`         | Unique identifier for your Forge app. Generated when you [register your app](#register-app).                  | Yes               |
-| `TAG`            | Version tag for your container images. Must be changed for each new image push as tags are immutable.         | Yes               |
-| `REPOSITORY_URI` | URI for your container image repository. You'll create this repository [in a later step](#configure-service). | Yes               |
-| `ENV_ID`         | ID of the environment where your app is deployed. Used for local testing with `forge tunnel`.                 | For local testing |
+| Variable   | Description                                                                                                   | Required          |
+|------------|---------------------------------------------------------------------------------------------------------------|-------------------|
+| `APP_ID`   | Unique identifier for your Forge app. Generated when you [register your app](#register-app).                  | Yes               |
+| `TAG`      | Version tag for your container images. Must be changed for each new image push as tags are immutable.         | Yes               |
+| `REPO_URI` | URI for your container image repository. You'll create this repository [in a later step](#configure-service). | Yes               |
+| `ENV_ID`   | ID of the environment where your app is deployed. Used for local testing with `forge tunnel`.                 | For local testing |
 
 ## Get started <a id="get-started"></a>
 
@@ -67,7 +67,7 @@ You'll be provided with the repository URI for your container images. If needed,
 > **TIP:** Set your URI as an environment variable, so you can easily access it later:
 >
 > ```bash
-> export REPOSITORY_URI=forge-ecr.services.atlassian.com/forge/$APP_ID/java-service
+> export REPO_URI=forge-ecr.services.atlassian.com/forge/$APP_ID/java-service
 > ```
 
 ## Build & push image <a id="build--push-image"></a>
@@ -83,10 +83,10 @@ To run this service on Forge Containers, you'll need to build its image and push
 Create your service's container image locally. When creating a Docker image, build it for platform `linux/amd64`:
 
 ```bash
-docker build ./services/java-spring-server -t "$REPOSITORY_URI:$TAG" --platform linux/amd64
+docker build ./services/java-spring-server -t "$REPO_URI:$TAG" --platform linux/amd64
 ```
 
-> **NOTE:** We use the `REPOSITORY_URI` and `TAG` variables which we defined in earlier sections.
+> **NOTE:** We use the `REPO_URI` and `TAG` variables which we defined in earlier sections.
 
 ### Step 2: Authenticate the Docker CLI
 
@@ -99,7 +99,7 @@ This command will use your `forge login` credentials to create a temporary API t
 You can now use `docker push` to upload the image you built locally:
 
 ```bash
-docker push "$REPOSITORY_URI:$TAG"
+docker push "$REPO_URI:$TAG"
 ```
 
 > **NOTE:** Forge Container image tags are immutable so you will need to change the value of `TAG` to push additional changes.
