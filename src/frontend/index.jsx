@@ -10,8 +10,8 @@ const App = () => {
     const [data, setData] = useState(null);
     const [realtimeData, setRealtimeData] = useState(null);
     const [globalRealtimeData, setGlobalRealtimeData] = useState(null);
-    const [globalTokenRealtimeData, setGlobalTokenRealtimeData] =
-        useState(null);
+    const [globalTokenRealtimeData, setGlobalTokenRealtimeData] = useState(null);
+    const [offlineAccessRealtimeData, setOfflineAccessRealtimeData] = useState(null);
 
     useEffect(() => {
         console.log("Calling POST /invoke-service ...");
@@ -133,6 +133,24 @@ const App = () => {
         subscribeToGlobalTokenChannel();
     }, []);
 
+    // This subscribes to a channel which a realtime event is sent to every 15 seconds using offline access
+    useEffect(() => {
+        const channelName = "offline-access-global-realtime-channel";
+        const subscribeToOfflineAccessGlobalChannel = async () => {
+            const onEvent = (payload) => {
+                console.log("Received offline access event with payload...: ", payload);
+                setOfflineAccessRealtimeData(payload);
+            };
+            const subscription = await realtime.subscribeGlobal(
+                channelName,
+                onEvent
+            );
+            console.log(`Subscribed to offline access channel: ${channelName}`, subscription);
+        };
+
+        subscribeToOfflineAccessGlobalChannel();
+    }, []);
+
     return (
         <>
             <Text>
@@ -143,6 +161,9 @@ const App = () => {
             </Text>
             <Text>
                 Global tokened realtime event received: {JSON.stringify(globalTokenRealtimeData, null, 2)}
+            </Text>
+            <Text>
+                Offline access realtime event received: {JSON.stringify(offlineAccessRealtimeData, null, 2)}
             </Text>
             <InvokeServicePanelComponent data={data} />
         </>

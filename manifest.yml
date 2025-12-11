@@ -5,9 +5,11 @@ services:
         tunnel:
           docker:
             build:
-              context: ./services/java-spring-server # This should be an absolute path to the Docker build context
+              # 'context' must be an absolute or relative path to the Dockerfile.
+              context: ./services/java-spring-server
               dockerfile: Dockerfile
-            image: java-service:${TAG} # If the image doesn't exist, it will be built based on the build context then started up
+            # If the image doesn't exist, it will first be built based on the 'context' path, then started up.
+            image: java-service:${TAG}
             ports:
               - "8080:8080"
             environment:
@@ -44,6 +46,8 @@ modules:
       endpoint: webtrigger-ep-realtime-token
     - key: http-webtrigger
       endpoint: webtrigger-http
+    - key: egress-webtrigger
+      endpoint: webtrigger-egress
     - key: sql-webtrigger
       endpoint: webtrigger-sql
     - key: kvs-webtrigger
@@ -86,6 +90,10 @@ modules:
       service: java-service
       route:
         path: /webtrigger
+    - key: webtrigger-egress
+      service: java-service
+      route:
+        path: /webtrigger/egress
     - key: webtrigger-http
       service: java-service
       route:
@@ -148,7 +156,7 @@ permissions:
   external:
     fetch:
       backend:
-        - address: https://httpbin.org
+        - address: https://webhook-tester.dev.services.atlassian.com
           inScopeEUD: false
 
 resources:

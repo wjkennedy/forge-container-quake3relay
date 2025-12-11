@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
@@ -25,6 +26,8 @@ public class EgressClient {
     user
   }
 
+  public record Installation(String id) {}
+
   private static String getAuthHeader(final String invocationId, final AuthType authType, @Nullable final String accountId) {
     var authHeader = String.format("Forge id=%s", invocationId);
     if (authType != null) {
@@ -36,6 +39,10 @@ public class EgressClient {
 
     return authHeader;
   }
+
+  private static String getInstallationAuthHeader(final String installationId) {
+    return "Forge installationId=" + installationId + ",as=app";
+} 
 
   private final RestClient restClient;
   private final ObjectMapper objectMapper;
@@ -60,7 +67,7 @@ public class EgressClient {
           final URI uri,
           final AuthType authType,
           @Nullable final String accountId) {
-    return sendRequestWithBody(requestType, invocationId, httpMethod, uri, null, authType, null);
+    return sendRequestWithBody(requestType, invocationId, httpMethod, uri, null, authType, accountId);
   }
 
   public ResponseEntity<JsonNode> sendRequestWithBody(
@@ -100,6 +107,15 @@ public class EgressClient {
     return sendJiraRequest(invocationId, authType, HttpMethod.GET, "rest/api/3/myself", null, null);
   }
 
+  public List<Installation> getInstallations() {
+
+    return restClient.get()
+            .uri(egressProxyUrl + "/v0/installations")
+            .retrieve()
+            .toEntity(new ParameterizedTypeReference<List<Installation>>() {})
+            .getBody();
+  }
+
   public ResponseEntity<JsonNode> commentOnIssue(final String invocationId, String issueKey, Object body, @Nullable final String accountId) {
     final String path = "/rest/api/3/issue/" + issueKey + "/comment";
     final AuthType authType = (accountId != null) ? AuthType.user : AuthType.app;
@@ -123,8 +139,13 @@ public class EgressClient {
   /**
    * This will publish a realtime message to a specified channel. This does not publish to a global channel.
    */
-  public ResponseEntity<JsonNode> publishRealtimeMessage(final String invocationId, final String channelName,
-      final String payload, @Nullable final String token, @Nullable final Boolean isGlobal) {
+  public ResponseEntity<JsonNode> publishRealtimeMessage(
+          final String invocationId,
+          final String channelName,
+          final String payload,
+          @Nullable final String token,
+          @Nullable final Boolean isGlobal) {
+
     final String globalString = isGlobal != null && isGlobal ? "/global" : "";
     var uri = URI.create(egressProxyUrl + "/forge/realtime/v1/publish" + globalString);
 
@@ -142,19 +163,48 @@ public class EgressClient {
         AuthType.app, null);
   }
 
+  
   /**
    * This will publish a realtime message to a specified global channel.
    */
-  public ResponseEntity<JsonNode> publishGlobalRealtimeMessage(final String invocationId, final String channelName,
-      final String payload, @Nullable final String token) {
+  public ResponseEntity<JsonNode> publishGlobalRealtimeMessage(
+          final String invocationId,
+          final String channelName,
+          final String payload,
+          @Nullable final String token) {
+
     return publishRealtimeMessage(invocationId, channelName, payload, token, true);
+  }
+  
+  /**
+   * This will publish a realtime message to a global channel using offline access.
+   * Offline access calls do not require an invocationId, but instead use an installationId.
+   */
+  public void publishGlobalRealtimeMessageUsingOfflineAccess(
+          final String channelName,
+          final String payload,
+          final String installationId) {
+
+    final ObjectNode realtimeEvent = objectMapper.createObjectNode()
+            .put("name", channelName)
+            .put("payload", payload);
+
+    restClient.post()
+            .uri(egressProxyUrl + "/forge/realtime/v1/publish/global")
+            .body(realtimeEvent)
+            .header(ForgeEgressHeaders.FORGE_AUTHORIZATION, getInstallationAuthHeader(installationId))
+            .retrieve()
+            .toEntity(String.class);
   }
 
   /**
    * This will sign a realtime token for a specified channel with the provided claims.
    */
-  public ResponseEntity<JsonNode> signRealtimeToken(final String invocationId, final String channelName,
-      ObjectNode claims) {
+  public ResponseEntity<JsonNode> signRealtimeToken(
+          final String invocationId,
+          final String channelName,
+          ObjectNode claims) {
+
     var uri = URI.create(egressProxyUrl + "/forge/realtime/v1/token");
 
     final ObjectNode realtimeEvent = objectMapper.createObjectNode()
@@ -165,7 +215,9 @@ public class EgressClient {
         AuthType.app, null);
   }
 
-  public ResponseEntity<JsonNode> runSQLQuery(final String invocationId, final String query,
+  public ResponseEntity<JsonNode> runSQLQuery(
+          final String invocationId,
+          final String query,
           final List<Object> params) {
 
     final ObjectNode queryExecutionRequest = objectMapper.createObjectNode()
@@ -185,6 +237,21 @@ public class EgressClient {
 
     var uri = URI.create(egressProxyUrl + "/forge/storage/kvs/v1/set");
     return sendRequestWithBody("Set KVS request", invocationId, HttpMethod.POST, uri, objectNodeSet, null, null);
+  }
+
+  /**
+   * Offline access calls do not require an invocationId, but instead use an installationId.
+   */
+  public void setValueToKvsUsingOfflineAccess(final ObjectNode objectNodeSet, final String installationId) {
+
+    // Set authorization header to perform action on behalf of installation using offline access
+    // "Forge installationId=<installationId>,as=app"
+    restClient.post()
+            .uri(egressProxyUrl + "/forge/storage/kvs/v1/set")
+            .body(objectNodeSet)
+            .header(ForgeEgressHeaders.FORGE_AUTHORIZATION, getInstallationAuthHeader(installationId))
+            .retrieve()
+            .toEntity(String.class);
   }
 
   public ResponseEntity<JsonNode> getValueFromKvs(final String invocationId, final String key) {
