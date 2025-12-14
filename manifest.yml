@@ -174,4 +174,5 @@ environment:
   variables:
     - key: TAG
       default: latest
-    - APP_ID
+    - key: APP_ID
+      default: FORGE_REGISTER_ME
