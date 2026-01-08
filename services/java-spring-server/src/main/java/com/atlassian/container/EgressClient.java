@@ -5,6 +5,8 @@ import com.atlassian.container.exceptions.EgressRequestException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpMethod;
@@ -20,6 +22,8 @@ import java.util.Optional;
 
 @Component
 public class EgressClient {
+
+  private static final Logger log = LoggerFactory.getLogger(EgressClient.class);
 
   public enum AuthType {
     app,
@@ -89,7 +93,8 @@ public class EgressClient {
 
     return request.retrieve()
             .onStatus(HttpStatusCode::isError,
-            (req, response) -> {
+            (_, response) -> {
+              log.error("{} failed with status {}", requestType, response.getStatusCode());
               throw new EgressRequestException(requestType + " failed with status " + response.getStatusCode() + ": " + response.getBody());
             }).toEntity(JsonNode.class);
   }
@@ -282,8 +287,7 @@ public class EgressClient {
    *        "key": "<string>",
    *      }
    *    ]
-   * 
-   * Reference: https://developer.atlassian.com/platform/forge/rest/api-group-transaction/#api-v1-transaction-post-request 
+   * Reference: <a href="https://developer.atlassian.com/platform/forge/rest/api-group-transaction/#api-v1-transaction-post-request">KvsTransactionRequest Docs</a>
    */
   public record SetTransactionSchema(String key, String value) {}
   public record BaseTransactionSchema(String key) {}

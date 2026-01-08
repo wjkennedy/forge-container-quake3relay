@@ -43,11 +43,11 @@ public class WebTriggerEndpoint {
     @PostMapping("/http")
     public Map<String, String> post(@RequestHeader(INVOCATION_ID) String invocationId) {
 
-        //Fetch invocationContext
+        // Fetch invocationContext
         final ResponseEntity<JsonNode> invocationContext = egressClient.getInvocationContext(invocationId);
         log.info("Invocation context: {}", invocationContext.getBody());
 
-        //Make Jira Request
+        // Make Jira Request
         log.info("Received Jira response: {}", egressClient.getCurrentUser(invocationId, AuthType.app));
 
         return singletonMap("message", "Hello Forge Container World");
@@ -57,10 +57,10 @@ public class WebTriggerEndpoint {
     @PostMapping("/egress")
     public Map<String, String> egress(@RequestHeader(INVOCATION_ID) String invocationId) {
 
-        //Make Egress Request
-        final String egressUrl = "webhook-tester.dev.services.atlassian.com/apkw89a";
+        // Make Egress Request
+        final String egressUrl = "docs.googleapis.com/$discovery/rest?version=v1";
         final ResponseEntity<JsonNode> egressResponse = egressClient.sendEgressRequest(invocationId, HttpMethod.GET, egressUrl);
-        log.info("Received egress response: {}", egressResponse);
+        log.info("Received egress response with status code: {}", egressResponse.getStatusCode());
 
         if (!egressResponse.getStatusCode().is2xxSuccessful()) {
             throw new ResponseStatusException(HttpStatusCode.valueOf(500),

@@ -4,12 +4,14 @@ services:
       - key: java-service
         tunnel:
           docker:
+            # Either 'build' or 'image' should be supplied, but not both.
+            # If 'build' is supplied, the image will be rebuilt each time the tunnel is started.
             build:
               # 'context' must be an absolute or relative path to the Dockerfile.
               context: ./services/java-spring-server
               dockerfile: Dockerfile
-            # If the image doesn't exist, it will first be built based on the 'context' path, then started up.
-            image: java-service:${TAG}
+            # Alternatively, specify a pre-built image. Leave commented out if using 'build' above.
+          # image: java-service:${TAG}
             ports:
               - "8080:8080"
             environment:
@@ -40,10 +42,6 @@ modules:
       title: panel-with-resolver-function
       icon: https://developer.atlassian.com/platform/forge/images/icons/issue-panel-icon.svg
   webtrigger:
-    - key: webtrigger-realtime-global
-      endpoint: webtrigger-ep-realtime-global
-    - key: webtrigger-realtime-token
-      endpoint: webtrigger-ep-realtime-token
     - key: http-webtrigger
       endpoint: webtrigger-http
     - key: egress-webtrigger
@@ -62,6 +60,10 @@ modules:
       endpoint: async-event-publish-ep
     - key: async-event-retrieve-wt
       endpoint: async-event-retrieve-ep
+    - key: webtrigger-realtime-global
+      endpoint: webtrigger-ep-realtime-global
+    - key: webtrigger-realtime-token
+      endpoint: webtrigger-ep-realtime-token
   function:
     - key: runMigration
       handler: db.runMigration
@@ -156,8 +158,7 @@ permissions:
   external:
     fetch:
       backend:
-        - address: https://webhook-tester.dev.services.atlassian.com
-          inScopeEUD: false
+        - address: https://docs.googleapis.com
 
 resources:
   - key: main
