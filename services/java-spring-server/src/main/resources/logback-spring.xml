@@ -5,7 +5,7 @@
 
     <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
         <encoder class="net.logstash.logback.encoder.LogstashEncoder">
-            <includeMdcKeyName>forge.invocation</includeMdcKeyName>
+            <includeMdcKeyName>forge_invocation</includeMdcKeyName>
             <fieldNames>
                 <timestamp>ts</timestamp>
                 <message>msg</message>
