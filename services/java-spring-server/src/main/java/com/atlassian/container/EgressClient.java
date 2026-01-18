@@ -46,7 +46,12 @@ public class EgressClient {
 
   private static String getInstallationAuthHeader(final String installationId) {
     return "Forge installationId=" + installationId + ",as=app";
-} 
+  }
+
+  private static String getInstallationAuthHeaderForOfflineAccessUserImpersonation(final String installationId,
+      final String accountId) {
+    return "Forge installationId=" + installationId + ",as=user,accountId=" + accountId;
+  }
 
   private final RestClient restClient;
   private final ObjectMapper objectMapper;
@@ -110,6 +115,16 @@ public class EgressClient {
 
   public ResponseEntity<JsonNode> getCurrentUser(final String invocationId, AuthType authType) {
     return sendJiraRequest(invocationId, authType, HttpMethod.GET, "rest/api/3/myself", null, null);
+  }
+
+  public ResponseEntity<String> getCurrentUserUsingOfflineAccess(final String installationId, final String accountId) {
+    var uri = URI.create(egressProxyUrl + "/jira/rest/api/3/myself");
+    return restClient.method(HttpMethod.GET)
+        .uri(uri)
+        .header(ForgeEgressHeaders.FORGE_AUTHORIZATION,
+            getInstallationAuthHeaderForOfflineAccessUserImpersonation(installationId, accountId))
+        .retrieve()
+        .toEntity(String.class);
   }
 
   public List<Installation> getInstallations() {

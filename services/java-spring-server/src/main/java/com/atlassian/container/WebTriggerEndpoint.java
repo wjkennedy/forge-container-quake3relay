@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
@@ -40,8 +41,8 @@ public class WebTriggerEndpoint {
     }
 
     @ResponseBody
-    @PostMapping("/http")
-    public Map<String, String> post(@RequestHeader(INVOCATION_ID) String invocationId) {
+    @RequestMapping(value = "/http", method = {RequestMethod.GET, RequestMethod.POST})
+    public Map<String, String> http(@RequestHeader(INVOCATION_ID) String invocationId) {
 
         // Fetch invocationContext
         final ResponseEntity<JsonNode> invocationContext = egressClient.getInvocationContext(invocationId);
@@ -54,7 +55,7 @@ public class WebTriggerEndpoint {
     }
 
     @ResponseBody
-    @PostMapping("/egress")
+    @RequestMapping(value = "/egress", method = {RequestMethod.GET, RequestMethod.POST})
     public Map<String, String> egress(@RequestHeader(INVOCATION_ID) String invocationId) {
 
         // Make Egress Request
