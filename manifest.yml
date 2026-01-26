@@ -22,6 +22,9 @@ services:
           type: http
           route:
             path: /health
+        resources:
+          cpu: "1"
+          memory: "2Gi"
 
 modules:
   sql:
