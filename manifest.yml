@@ -1,186 +1,50 @@
 services:
-  - key: java-service
+  - key: q3-relay
     containers:
-      - key: java-service
+      - key: quake3-allinone
         tunnel:
           docker:
-            # Either 'build' or 'image' should be supplied, but not both.
-            # If 'build' is supplied, the image will be rebuilt each time the tunnel is started.
             build:
-              # 'context' must be an absolute or relative path to the Dockerfile.
-              context: ./services/java-spring-server
+              context: ./services/quake3-allinone
               dockerfile: Dockerfile
-            # Alternatively, specify a pre-built image. Leave commented out if using 'build' above.
-            # image: java-service:${TAG}
             ports:
               - "8080:8080"
             environment:
-              - CUSTOM_TUNNEL_ENV_VAR=custom_tunnel_env_var
-              - OFFLINE_ACCESS_USER_IMPERSONATION_DEMO_ACCOUNT_ID=offline_access_user_impersonation_demo_account_id
+              - SERVER_PORT=8080
         tag: ${TAG}
         health:
           type: http
           route:
-            path: /health
+            path: /healthz
         resources:
           cpu: "1"
           memory: "2Gi"
+    scaling:
+      min: 1
+      max: 1
 
 modules:
-  sql:
-    - key: main
-      engine: mysql
-  jira:issuePanel:
-    - key: jira-issue-panel-container
-      resource: main
-      resolver:
-        endpoint: invoke-service-frontend-ep
-      render: native
-      title: jira-issue-panel-container
-      icon: https://developer.atlassian.com/platform/forge/images/icons/issue-panel-icon.svg
-    - key: panel-with-resolver-fn
-      resource: panel-resource
-      resolver:
-        function: panel-resolver-fn
-      render: native
-      title: panel-with-resolver-function
-      icon: https://developer.atlassian.com/platform/forge/images/icons/issue-panel-icon.svg
   webtrigger:
-    - key: http-webtrigger
-      endpoint: webtrigger-http
-    - key: egress-webtrigger
-      endpoint: webtrigger-egress
-    - key: sql-webtrigger
-      endpoint: webtrigger-sql
-    - key: kvs-webtrigger
-      endpoint: webtrigger-kvs-transaction
-    - key: dynamic-modules-webtrigger
-      endpoint: webtrigger-dynamic-modules
-    - key: run-migration
-      function: runMigration
-    - key: latest-scheduled-trigger-time
-      endpoint: latest-scheduled-trigger-time-ep
-    - key: async-event-publish-wt
-      endpoint: async-event-publish-ep
-    - key: async-event-retrieve-wt
-      endpoint: async-event-retrieve-ep
-    - key: webtrigger-realtime-global
-      endpoint: webtrigger-ep-realtime-global
-    - key: webtrigger-realtime-token
-      endpoint: webtrigger-ep-realtime-token
-  function:
-    - key: runMigration
-      handler: db.runMigration
-    - key: panel-resolver-fn
-      handler: panel.handler
-  trigger:
-    - key: container-product-trigger-event
-      endpoint: product-event-trigger-ep
-      events:
-        - avi:jira:updated:issue
-        - avi:jira:assigned:issue
-  scheduledTrigger:
-    - key: container-scheduled-trigger-event
-      endpoint: scheduled-trigger-ep
-      interval: fiveMinute
-    - key: db-migration-trigger
-      function: runMigration
-      interval: hour
-  consumer:
-    - key: async-event-consumer
-      queue: test-async-event-queue
-      endpoint: async-event-handle-ep
-      crossVersion: true
+    - key: q3-relay-health-trigger
+      endpoint: q3-relay-health
   endpoint:
-    - key: webtrigger-ep
-      service: java-service
+    - key: q3-relay-health
+      service: q3-relay
       route:
-        path: /webtrigger
-    - key: webtrigger-egress
-      service: java-service
+        path: /healthz
+    - key: q3-relay-root
+      service: q3-relay
       route:
-        path: /webtrigger/egress
-    - key: webtrigger-http
-      service: java-service
-      route:
-        path: /webtrigger/http
-    - key: webtrigger-sql
-      service: java-service
-      route:
-        path: /webtrigger/sql
-    - key: webtrigger-kvs-transaction
-      service: java-service
-      route:
-        path: /webtrigger/kvs-transaction
-    - key: webtrigger-dynamic-modules
-      service: java-service
-      route:
-        path: /webtrigger/dynamic-modules
-    - key: async-event-publish-ep
-      service: java-service
-      route:
-        path: /async-events/publish
-    - key: async-event-handle-ep
-      service: java-service
-      route:
-        path: /async-events/handle
-    - key: async-event-retrieve-ep
-      service: java-service
-      route:
-        path: /async-events/latest
-    - key: product-event-trigger-ep
-      service: java-service
-      route:
-        path: /product-event-trigger
-    - key: scheduled-trigger-ep
-      service: java-service
-      route:
-        path: /scheduled-trigger
-    - key: latest-scheduled-trigger-time-ep
-      service: java-service
-      route:
-        path: /latest-scheduled-trigger-time
-    - key: webtrigger-ep-realtime-global
-      service: java-service
-      route:
-        path: /webtrigger/realtime/global
-    - key: webtrigger-ep-realtime-token
-      service: java-service
-      route:
-        path: /webtrigger/realtime/token
-    - key: invoke-service-frontend-ep
-      service: java-service
-
-permissions:
-  scopes:
-    read:jira-user:
-      allowImpersonation: true
-    read:jira-work: {}
-    read:app-global-channel:realtime: {}
-    write:jira-work:
-      allowImpersonation: true
-    storage:app: {}
-  external:
-    fetch:
-      backend:
-        - address: https://docs.googleapis.com
-
-resources:
-  - key: main
-    path: src/frontend/index.jsx
-  - key: panel-resource
-    path: src/frontend/panel-with-backend-fn.jsx
+        path: /
 
 app:
   runtime:
     name: nodejs22.x
-  id: ari:cloud:ecosystem::app/${APP_ID}
+  id: ari:cloud:ecosystem::app/0fc32483-5342-46c9-9c21-2d5b6c68a963
 
 environment:
   variables:
     - key: TAG
-      default: latest
+      default: q3-allinone-test-20260421
     - key: APP_ID
-      default: FORGE_REGISTER_ME
-    - key: OFFLINE_ACCESS_USER_IMPERSONATION_DEMO_ACCOUNT_ID
-      default: offline_access_user_impersonation_demo_account_id
+      default: 00000000-0000-4000-8000-000000000000

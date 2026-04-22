@@ -1,0 +1,7 @@
+services:
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: q3-relay-cloudflared
+    command: tunnel --no-autoupdate --protocol http2 --url http://q3-relay:8080
+    depends_on:
+      - q3-relay

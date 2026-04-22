@@ -1,27 +1,27 @@
 services:
-
-  java-service:
+  q3-relay:
     build:
-        context: ./services/java-spring-server
-        dockerfile: Dockerfile
-    image: java-service:latest
-    container_name: java-service
+      context: ./services/quake3-allinone
+      dockerfile: Dockerfile
+    image: forge-q3-allinone:${TAG:-q3-allinone-test-20260421}
+    container_name: q3-relay
     ports:
-      - "8080:8080"
+      - "${HOST_PORT:-8080}:8080"
     environment:
+      - SERVER_PORT=8080
       - FORGE_EGRESS_PROXY_URL=http://proxy-sidecar:7072
 
   proxy-sidecar:
     image: forge-ecr.services.atlassian.com/forge-platform/proxy-sidecar:latest
     container_name: containers-proxy-sidecar
     environment:
-      - SERVICE_URL=http://java-service:8080
+      - SERVICE_URL=http://q3-relay:8080
       - FOP_BASE_URL=https://forge-outbound-proxy.services.atlassian.com
-      - APP_ID=ari:cloud:ecosystem::app/$APP_ID
-      - ENV_ID=ari:cloud:ecosystem::environment/$APP_ID/$ENV_ID
+      - APP_ID=ari:cloud:ecosystem::app/${APP_ID:-00000000-0000-4000-8000-000000000000}
+      - ENV_ID=ari:cloud:ecosystem::environment/${APP_ID:-00000000-0000-4000-8000-000000000000}/${ENV_ID:-00000000-0000-4000-8000-000000000000}
       - JWKS_URL=https://forge.cdn.prod.atlassian-dev.net/.well-known/jwks.json
       - IS_LOCAL_DEV=true
     ports:
       - "7071:7071"
     depends_on:
-      - java-service
+      - q3-relay

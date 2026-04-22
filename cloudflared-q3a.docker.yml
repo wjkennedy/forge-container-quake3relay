@@ -1,0 +1,8 @@
+tunnel: a2596a04-bcd3-46f2-94b7-083e357342d2
+credentials-file: /etc/cloudflared/a2596a04-bcd3-46f2-94b7-083e357342d2.json
+protocol: http2
+
+ingress:
+  - hostname: q3a.a9group.net
+    service: http://q3-relay:8080
+  - service: http_status:404

@@ -1,0 +1,7 @@
+services:
+  cloudflared-named:
+    image: cloudflare/cloudflared:latest
+    container_name: q3-relay-cloudflared-named
+    command: tunnel --no-autoupdate --protocol http2 run --token ${CLOUDFLARED_TOKEN:?Set CLOUDFLARED_TOKEN to the token from Cloudflare Zero Trust}
+    depends_on:
+      - q3-relay

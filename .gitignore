@@ -3,4 +3,3 @@ node_modules
 .vscode/
 .services
 .container-service-assets
-package-lock.json

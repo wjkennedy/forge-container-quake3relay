@@ -5,13 +5,29 @@
   "author": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "container:build": "docker build services/quake3-allinone --platform linux/amd64 -t forge-q3-allinone:local",
+    "container:run": "docker run --rm --platform linux/amd64 -p 8080:8080 -e SERVER_PORT=8080 --name forge-q3-allinone-local forge-q3-allinone:local",
+    "container:up": "docker compose up --build q3-relay",
+    "container:up:detached": "docker compose up -d --build q3-relay",
+    "container:down": "docker compose down -v",
+    "tunnel:up": "npm run tunnel:quick",
+    "tunnel:quick": "docker compose -f docker-compose.yml -f docker-compose.cloudflare.yml up --build q3-relay cloudflared",
+    "tunnel:quick:down": "docker compose -f docker-compose.yml -f docker-compose.cloudflare.yml down -v",
+    "tunnel:named": "docker compose -f docker-compose.yml -f docker-compose.cloudflare-token.yml up --build q3-relay cloudflared-named",
+    "tunnel:named:down": "docker compose -f docker-compose.yml -f docker-compose.cloudflare-token.yml down -v",
+    "tunnel:local-managed": "docker compose -f docker-compose.yml -f docker-compose.cloudflare-local.yml up --build -d q3-relay cloudflared-local",
+    "tunnel:local-managed:down": "docker compose -f docker-compose.yml -f docker-compose.cloudflare-local.yml down -v",
+    "tunnel:down": "npm run tunnel:quick:down",
+    "test:e2e:q3": "node tests/e2e/quake3-status.e2e.mjs",
+    "test:e2e:container": "bash scripts/test-local-container.sh",
+    "test": "npm run test:e2e:container"
   },
   "dependencies": {
     "@forge/api": "^6.1.0",
     "@forge/bridge": "^5.8.0",
     "@forge/react": "^11.2.6",
     "@forge/resolver": "^1.6.16",
-    "@forge/sql": "^3.0.0"
+    "@forge/sql": "^3.0.0",
+    "ws": "^8.17.1"
   }
 }
