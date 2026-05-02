@@ -2,9 +2,9 @@ services:
   cloudflared-local:
     image: cloudflare/cloudflared:latest
     container_name: q3-relay-cloudflared-local
-    command: tunnel --config /etc/cloudflared/config.yml run q3a-relay
+    command: tunnel --config /etc/cloudflared/config.yml run
     volumes:
-      - ./cloudflared-q3a.docker.yml:/etc/cloudflared/config.yml:ro
-      - ${HOME}/.cloudflared/a2596a04-bcd3-46f2-94b7-083e357342d2.json:/etc/cloudflared/a2596a04-bcd3-46f2-94b7-083e357342d2.json:ro
+      - ${CLOUDFLARED_RUNTIME_CONFIG:?Run scripts/prepare-cloudflared-tunnel.sh}:/etc/cloudflared/config.yml:ro
+      - ${CLOUDFLARED_RUNTIME_CREDENTIALS:?Run scripts/prepare-cloudflared-tunnel.sh}:/etc/cloudflared/credentials.json:ro
     depends_on:
       - q3-relay

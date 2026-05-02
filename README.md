@@ -49,6 +49,15 @@ If port `8080` is already in use:
 HOST_PORT=18080 npm run container:up
 ```
 
+Run an RCON command through the running container:
+
+```bash
+npm run container:rcon -- status
+npm run container:rcon -- 'say server admin connected'
+```
+
+The helper uses the existing server defaults: `127.0.0.1:27960`, UDP, no challenge handshake, and password `sphere`. Override them with `RCON_HOST`, `RCON_PORT`, `RCON_PASSWORD`, `RCON_TCP`, or `RCON_CHALLENGE` if you need different values.
+
 Health check:
 
 ```bash
@@ -62,6 +71,53 @@ npm test
 ```
 
 The test starts `q3-relay`, waits for `/healthz`, sends Quake 3 `getstatus` packets through WebSocket, and tears the container down.
+
+## LAN Party Start/Stop
+
+For the persistent Cloudflare tunnel on `q3a.a9group.net`, use the wrapper
+scripts in the repo root:
+
+```bash
+./start-lan-party.sh
+./stop-lan-party.sh
+```
+
+`start-lan-party.sh` starts the relay, brings up the persistent tunnel, waits
+for the local relay health check, validates the public hostname, and prints the
+stable relay URL `wss://q3a.a9group.net`.
+
+By default it uses `TUNNEL_MODE=auto`:
+
+- it prepares Cloudflare runtime files via `scripts/prepare-cloudflared-tunnel.sh`
+- it resolves the named tunnel from `CLOUDFLARED_TUNNEL_NAME` when possible
+- it validates the credentials JSON contents instead of trusting a hardcoded
+  filename or UUID
+- it can ensure the DNS route with `cloudflared tunnel route dns`
+- it prefers the locally managed tunnel when credentials are available
+- otherwise it falls back to the dashboard-token tunnel using
+  `CLOUDFLARED_TOKEN`
+
+If name resolution through local `cloudflared` auth is broken, you can pin the
+expected tunnel directly with `CLOUDFLARED_TUNNEL_ID`.
+
+You can force a mode explicitly:
+
+```bash
+TUNNEL_MODE=local-managed ./start-lan-party.sh
+TUNNEL_MODE=token ./start-lan-party.sh
+```
+
+Prepare the runtime tunnel files without starting Docker:
+
+```bash
+npm run tunnel:prepare
+```
+
+If you want DNS route creation to be enforced during prep, set:
+
+```bash
+CLOUDFLARED_ROUTE_DNS=always
+```
 
 ## Cloudflare Quick Tunnel
 

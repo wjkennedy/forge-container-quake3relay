@@ -1,9 +1,32 @@
 # Cloudflare Tunnel for q3a.a9group.net
 
-This repo supports two tunnel modes:
+This repo supports two persistent tunnel modes behind one preparation step:
 
 - quick tunnel: random `https://*.trycloudflare.com` URL for short local testing
 - named tunnel: persistent Cloudflare Tunnel routed from `q3a.a9group.net`
+
+## Runtime Preparation
+
+Before Docker starts either persistent tunnel mode, this repo now runs:
+
+```bash
+scripts/prepare-cloudflared-tunnel.sh
+```
+
+That script:
+
+- resolves the tunnel by `CLOUDFLARED_TUNNEL_NAME` when `cloudflared` and
+  `cert.pem` are available
+- supports `CLOUDFLARED_TUNNEL_ID` as an explicit fallback when local
+  name-resolution auth is stale
+- validates that the credentials JSON matches the resolved tunnel ID
+- generates `.cloudflared/config.yml` and `.cloudflared/credentials.json` for
+  Docker
+- can run `cloudflared tunnel route dns <tunnel> <hostname>` as part of prep
+- optionally refreshes the token for token mode and writes
+  `.cloudflared/token.txt`
+
+The runtime files are ignored by git and should not be edited by hand.
 
 ## Quick Tunnel
 
@@ -31,7 +54,8 @@ Hostname: q3a.a9group.net
 Service:  http://q3-relay:8080
 ```
 
-3. Copy the Docker tunnel token and export it locally:
+3. Copy the Docker tunnel token and export it locally, or let the prepare
+   script refresh it by tunnel name when `cert.pem` is available:
 
 ```bash
 export CLOUDFLARED_TOKEN='<cloudflare tunnel token>'
@@ -87,15 +111,27 @@ The CLI route path requires `~/.cloudflared/cert.pem`, created by:
 cloudflared tunnel login
 ```
 
-## Locally Managed q3a Tunnel
+To make DNS routing part of bringup, set:
 
-This repo also includes a Docker-ready locally-managed tunnel config:
-
-```text
-cloudflared-q3a.docker.yml
+```bash
+CLOUDFLARED_ROUTE_DNS=always
 ```
 
-It routes:
+Then `scripts/prepare-cloudflared-tunnel.sh` will run:
+
+```bash
+cloudflared tunnel route dns q3-websocket q3a.a9group.net
+```
+
+## Locally Managed q3a Tunnel
+
+This repo also includes a Docker-ready locally-managed tunnel path.
+
+```text
+scripts/prepare-cloudflared-tunnel.sh
+```
+
+The generated runtime config routes:
 
 ```text
 q3a.a9group.net -> http://q3-relay:8080
@@ -113,8 +149,8 @@ Stop it with:
 npm run tunnel:local-managed:down
 ```
 
-The credentials file mounted by `docker-compose.cloudflare-local.yml` lives
-under `~/.cloudflared` and must not be committed.
+The source credentials JSON still lives under `~/.cloudflared`, but Docker now
+mounts the validated runtime copy from `.cloudflared/credentials.json`.
 
 ## Notes
 
