@@ -1,0 +1,6 @@
+{
+name      ForgeMike
+funname   Mike
+model     kangoo/blue
+aifile    bots/sarge_c.c
+}

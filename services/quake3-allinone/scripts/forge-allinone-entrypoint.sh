@@ -3,6 +3,7 @@ set -eu
 
 GAME_PORT="${GAME_PORT:-27960}"
 SERVER_PORT="${SERVER_PORT:-${PROXY_PORT:-8080}}"
+DEDICATED_MODE="${DEDICATED_MODE:-1}"
 export PROXY_PORT="$SERVER_PORT"
 export TARGET_HOST="${TARGET_HOST:-127.0.0.1}"
 export TARGET_PORT="${TARGET_PORT:-$GAME_PORT}"
@@ -13,7 +14,7 @@ mkdir -p "$Q3_HOME/baseq3" /tmp/forge-q3
 
 if [ -f /opt/ioquake3/demoq3/pak0.pk3 ]; then
   /usr/lib/ioquake3/ioq3ded \
-    +set dedicated 2 \
+    +set dedicated "$DEDICATED_MODE" \
     +set sv_pure 0 \
     +set net_ip 127.0.0.1 \
     +set net_port "$GAME_PORT" \
@@ -25,7 +26,7 @@ if [ -f /opt/ioquake3/demoq3/pak0.pk3 ]; then
     +exec server.cfg &
 elif [ -f /opt/ioquake3/baseq3/pak0.pk3 ]; then
   /usr/lib/ioquake3/ioq3ded \
-    +set dedicated 2 \
+    +set dedicated "$DEDICATED_MODE" \
     +set sv_pure 1 \
     +set net_ip 127.0.0.1 \
     +set net_port "$GAME_PORT" \
