@@ -12,13 +12,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 RUN npm init -y \
-    && npm install --omit=dev ws@8.17.1 \
+    && npm install --omit=dev ws@8.17.1 rcon@1.1.0 \
     && npm cache clean --force
 
 RUN mkdir -p /opt/ioquake3/baseq3 /opt/ioquake3/demoq3
 
 COPY scripts/relay-server-enhanced.mjs ./scripts/relay-server-enhanced.mjs
 COPY scripts/q3-mock-server.mjs ./scripts/q3-mock-server.mjs
+COPY scripts/rcon-client.mjs ./scripts/rcon-client.mjs
 COPY baseq3/ /opt/ioquake3/baseq3/
 COPY demoq3/ /opt/ioquake3/demoq3/
 COPY server.cfg /opt/ioquake3/demoq3/server.cfg
