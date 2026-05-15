@@ -36,6 +36,7 @@ mkdir -p "${CLOUDFLARED_RUNTIME_DIR}"
 
 resolved_tunnel_id=""
 resolved_tunnel_name=""
+resolved_tunnel_ref=""
 credentials_source_file="${CLOUDFLARED_CREDENTIALS_FILE:-}"
 credentials_tunnel_id=""
 credentials_account_tag=""
@@ -263,6 +264,15 @@ if [[ -z "${resolved_tunnel_name}" ]]; then
   resolved_tunnel_name="${CLOUDFLARED_TUNNEL_NAME}"
 fi
 
+# Inside the Docker cloudflared container we only mount runtime credentials/token
+# files, so prefer the stable tunnel UUID over the display name whenever it is
+# available. That avoids an extra name lookup dependency during tunnel startup.
+if [[ -n "${resolved_tunnel_id}" ]]; then
+  resolved_tunnel_ref="${resolved_tunnel_id}"
+else
+  resolved_tunnel_ref="${resolved_tunnel_name}"
+fi
+
 case "${CLOUDFLARED_TUNNEL_MODE}" in
   auto)
     if [[ "${need_credentials_validation}" == "true" ]]; then
@@ -336,7 +346,7 @@ if [[ -n "${credentials_source_file}" ]]; then
 fi
 
 cat > "${CLOUDFLARED_RUNTIME_CONFIG}" <<EOF
-tunnel: ${resolved_tunnel_name}
+tunnel: ${resolved_tunnel_ref}
 credentials-file: /etc/cloudflared/credentials.json
 protocol: http2
 
@@ -356,6 +366,7 @@ cat > "${CLOUDFLARED_RUNTIME_ENV}" <<EOF
 CLOUDFLARED_TUNNEL_MODE=${CLOUDFLARED_TUNNEL_MODE}
 CLOUDFLARED_TUNNEL_NAME=${resolved_tunnel_name}
 CLOUDFLARED_TUNNEL_ID=${resolved_tunnel_id}
+CLOUDFLARED_TUNNEL_REF=${resolved_tunnel_ref}
 CLOUDFLARED_PUBLIC_HOSTNAME=${CLOUDFLARED_PUBLIC_HOSTNAME}
 CLOUDFLARED_ORIGIN_URL=${CLOUDFLARED_ORIGIN_URL}
 CLOUDFLARED_ROUTE_DNS=${CLOUDFLARED_ROUTE_DNS}
@@ -371,6 +382,7 @@ echo "Prepared Cloudflare tunnel runtime files."
 echo "  mode:        ${CLOUDFLARED_TUNNEL_MODE}"
 echo "  tunnel name: ${resolved_tunnel_name}"
 echo "  tunnel id:   ${resolved_tunnel_id}"
+echo "  config ref:  ${resolved_tunnel_ref}"
 if [[ -n "${credentials_source_file}" ]]; then
   echo "  credentials: ${credentials_source_file}"
 fi

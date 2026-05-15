@@ -27,11 +27,23 @@ modules:
   webtrigger:
     - key: q3-relay-health-trigger
       endpoint: q3-relay-health
+    - key: q3-relay-public-diag-trigger
+      endpoint: q3-relay-public-diag
+    - key: q3-relay-runtime-diag-trigger
+      endpoint: q3-relay-runtime-diag
   endpoint:
     - key: q3-relay-health
       service: q3-relay
       route:
         path: /healthz
+    - key: q3-relay-public-diag
+      service: q3-relay
+      route:
+        path: /diag/public-relay
+    - key: q3-relay-runtime-diag
+      service: q3-relay
+      route:
+        path: /diag/runtime
     - key: q3-relay-root
       service: q3-relay
       route:
@@ -45,6 +57,6 @@ app:
 environment:
   variables:
     - key: TAG
-      default: q3-allinone-test-20260421
+      default: q3arelay
     - key: APP_ID
-      default: 00000000-0000-4000-8000-000000000000
+      default: 0fc32483-5342-46c9-9c21-2d5b6c68a963
