@@ -9,6 +9,7 @@ WORKDIR /opt/forge-q3
 RUN apt-get update && apt-get install -y --no-install-recommends \
     bash \
     ca-certificates \
+    curl \
     ioquake3-server \
     netcat-openbsd \
     tini \
@@ -23,6 +24,7 @@ RUN mkdir -p /opt/ioquake3/baseq3 /opt/ioquake3/demoq3
 COPY services/quake3-allinone/scripts/relay-server-enhanced.mjs ./scripts/relay-server-enhanced.mjs
 COPY services/quake3-allinone/scripts/q3-mock-server.mjs ./scripts/q3-mock-server.mjs
 COPY services/quake3-allinone/scripts/rcon-client.mjs ./scripts/rcon-client.mjs
+COPY scripts/check-relay-websocket.mjs ./scripts/check-relay-websocket.mjs
 COPY services/quake3-allinone/baseq3/ /opt/ioquake3/baseq3/
 COPY services/quake3-allinone/demoq3/ /opt/ioquake3/demoq3/
 COPY services/quake3-allinone/server.cfg /opt/ioquake3/demoq3/server.cfg

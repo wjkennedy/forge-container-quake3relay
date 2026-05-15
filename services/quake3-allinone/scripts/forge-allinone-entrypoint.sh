@@ -13,10 +13,21 @@ CLOUDFLARED_PROTOCOL="${CLOUDFLARED_PROTOCOL:-http2}"
 CLOUDFLARED_RESTART_DELAY_SECONDS="${CLOUDFLARED_RESTART_DELAY_SECONDS:-5}"
 CLOUDFLARED_ORIGIN_URL="${CLOUDFLARED_ORIGIN_URL:-http://127.0.0.1:${SERVER_PORT}}"
 CLOUDFLARED_TUNNEL_LOG="${CLOUDFLARED_TUNNEL_LOG:-/tmp/cloudflared.log}"
+PUBLIC_HOSTNAME="${PUBLIC_HOSTNAME:-q3a.a9group.net}"
+PUBLIC_HTTP_URL="${PUBLIC_HTTP_URL:-https://${PUBLIC_HOSTNAME}/healthz}"
+PUBLIC_WS_URL="${PUBLIC_WS_URL:-wss://${PUBLIC_HOSTNAME}}"
+STRICT_STARTUP_CHECKS="${STRICT_STARTUP_CHECKS:-1}"
+STARTUP_LOCAL_HEALTH_ATTEMPTS="${STARTUP_LOCAL_HEALTH_ATTEMPTS:-60}"
+STARTUP_TUNNEL_ATTEMPTS="${STARTUP_TUNNEL_ATTEMPTS:-30}"
+STARTUP_PUBLIC_ATTEMPTS="${STARTUP_PUBLIC_ATTEMPTS:-20}"
+STARTUP_SLEEP_SECONDS="${STARTUP_SLEEP_SECONDS:-2}"
+PUBLIC_RECHECK_INTERVAL_SECONDS="${PUBLIC_RECHECK_INTERVAL_SECONDS:-60}"
 GAME_PID_FILE="${GAME_PID_FILE:-/tmp/q3-game.pid}"
 RELAY_PID_FILE="${RELAY_PID_FILE:-/tmp/q3-relay.pid}"
 CLOUDFLARED_PID_FILE="${CLOUDFLARED_PID_FILE:-/tmp/cloudflared.pid}"
 CLOUDFLARED_LOG_TAIL_PID=""
+WEBSOCKET_CHECK_SCRIPT="/opt/forge-q3/scripts/check-relay-websocket.mjs"
+LAST_PUBLIC_CHECK_EPOCH=0
 
 Q3_HOME="${Q3_HOME:-/tmp/ioquake3-home}"
 mkdir -p "$Q3_HOME/baseq3" /tmp/forge-q3
@@ -72,6 +83,77 @@ shutdown() {
   fi
   kill "${GAME_PID}" 2>/dev/null || true
   wait "${GAME_PID}" 2>/dev/null || true
+}
+
+restart_cloudflared() {
+  if [[ -z "${CLOUDFLARED_PID}" ]]; then
+    return 0
+  fi
+  echo "Restarting cloudflared after public tunnel failure." >&2
+  kill "${CLOUDFLARED_PID}" 2>/dev/null || true
+  wait "${CLOUDFLARED_PID}" 2>/dev/null || true
+  CLOUDFLARED_PID=""
+  rm -f "${CLOUDFLARED_PID_FILE}"
+  sleep "${CLOUDFLARED_RESTART_DELAY_SECONDS}"
+  start_cloudflared
+}
+
+require_local_health() {
+  local health_url="http://127.0.0.1:${SERVER_PORT}/healthz"
+  for _ in $(seq 1 "${STARTUP_LOCAL_HEALTH_ATTEMPTS}"); do
+    if curl -fsS "${health_url}" >/dev/null 2>&1; then
+      return 0
+    fi
+    sleep "${STARTUP_SLEEP_SECONDS}"
+  done
+
+  echo "Relay did not become healthy at ${health_url}." >&2
+  return 1
+}
+
+require_tunnel_registration() {
+  if [[ "${ENABLE_CLOUDFLARED}" != "true" && "${ENABLE_CLOUDFLARED}" != "1" ]]; then
+    return 0
+  fi
+
+  local tunnel_logs=""
+  for _ in $(seq 1 "${STARTUP_TUNNEL_ATTEMPTS}"); do
+    tunnel_logs="$(tail -n 200 "${CLOUDFLARED_TUNNEL_LOG}" 2>/dev/null || true)"
+    if grep -Eq 'Registered tunnel connection|Connection [A-Za-z0-9]+ registered|INF Registered tunnel connection' <<<"${tunnel_logs}"; then
+      return 0
+    fi
+    if grep -Eqi 'unauthorized|invalid token|403|serve tunnel error|failed to dial|i/o timeout|http_status:404' <<<"${tunnel_logs}"; then
+      echo "Cloudflared reported a tunnel startup failure." >&2
+      echo "${tunnel_logs}" >&2
+      return 1
+    fi
+    sleep "${STARTUP_SLEEP_SECONDS}"
+  done
+
+  echo "Cloudflared did not confirm a registered tunnel connection." >&2
+  echo "${tunnel_logs}" >&2
+  return 1
+}
+
+check_public_health_once() {
+  curl -fsS --max-time 15 "${PUBLIC_HTTP_URL}" >/dev/null 2>&1
+}
+
+check_public_websocket_once() {
+  RELAY_URL="${PUBLIC_WS_URL}" node "${WEBSOCKET_CHECK_SCRIPT}" >/dev/null 2>&1
+}
+
+require_public_path() {
+  local attempts="${1:-${STARTUP_PUBLIC_ATTEMPTS}}"
+  for _ in $(seq 1 "${attempts}"); do
+    if check_public_health_once && check_public_websocket_once; then
+      return 0
+    fi
+    sleep "${STARTUP_SLEEP_SECONDS}"
+  done
+
+  echo "Public relay path did not become healthy: ${PUBLIC_HTTP_URL} / ${PUBLIC_WS_URL}" >&2
+  return 1
 }
 
 trap shutdown INT TERM
@@ -132,6 +214,13 @@ if [[ "${ENABLE_CLOUDFLARED}" == "true" || "${ENABLE_CLOUDFLARED}" == "1" ]]; th
   start_cloudflared
 fi
 
+if [[ "${STRICT_STARTUP_CHECKS}" == "1" || "${STRICT_STARTUP_CHECKS}" == "true" ]]; then
+  require_local_health
+  require_tunnel_registration
+  require_public_path
+  LAST_PUBLIC_CHECK_EPOCH="$(date +%s)"
+fi
+
 while true; do
   if ! kill -0 "${GAME_PID}" 2>/dev/null; then
     echo "Game process exited; letting Forge restart the container." >&2
@@ -154,6 +243,25 @@ while true; do
     rm -f "${CLOUDFLARED_PID_FILE}"
     sleep "${CLOUDFLARED_RESTART_DELAY_SECONDS}"
     start_cloudflared
+    if [[ "${STRICT_STARTUP_CHECKS}" == "1" || "${STRICT_STARTUP_CHECKS}" == "true" ]]; then
+      require_tunnel_registration
+      require_public_path
+      LAST_PUBLIC_CHECK_EPOCH="$(date +%s)"
+    fi
+  fi
+
+  if [[ "${ENABLE_CLOUDFLARED}" == "true" || "${ENABLE_CLOUDFLARED}" == "1" ]]; then
+    now_epoch="$(date +%s)"
+    if (( now_epoch - LAST_PUBLIC_CHECK_EPOCH >= PUBLIC_RECHECK_INTERVAL_SECONDS )); then
+      if ! check_public_health_once || ! check_public_websocket_once; then
+        restart_cloudflared
+        if [[ "${STRICT_STARTUP_CHECKS}" == "1" || "${STRICT_STARTUP_CHECKS}" == "true" ]]; then
+          require_tunnel_registration
+          require_public_path
+        fi
+      fi
+      LAST_PUBLIC_CHECK_EPOCH="${now_epoch}"
+    fi
   fi
 
   sleep 2
