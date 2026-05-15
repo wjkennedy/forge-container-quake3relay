@@ -15,11 +15,9 @@ async function main() {
   const host = url.hostname;
   const path = `${url.pathname || '/'}${url.search || ''}`;
 
-  let candidates = await resolveWithNode(host);
-
-  if (candidates.length === 0) {
-    candidates = await resolveWithDig(host);
-  }
+  const nodeCandidates = await resolveWithNode(host);
+  const digCandidates = await resolveWithDig(host);
+  const candidates = dedupeCandidates([...nodeCandidates, ...digCandidates]);
 
   if (candidates.length === 0) {
     throw new Error(`public DNS did not resolve ${host} via 1.1.1.1`);
@@ -47,38 +45,37 @@ async function main() {
 }
 
 async function resolveWithNode(host) {
+  const candidates = [];
   for (const server of ['1.1.1.1', '1.0.0.1']) {
     const resolver = new dns.Resolver();
     resolver.setServers([server]);
 
     const ipv4 = await resolver.resolve4(host).catch(() => []);
     const ipv6 = await resolver.resolve6(host).catch(() => []);
-    const candidates = [...ipv4, ...ipv6];
-    if (candidates.length > 0) {
-      return candidates;
-    }
+    candidates.push(...ipv4, ...ipv6);
   }
 
-  return [];
+  return dedupeCandidates(candidates);
 }
 
 async function resolveWithDig(host) {
+  const candidates = [];
   for (const args of [
-    ['@1.1.1.1', '+short', host],
-    ['@1.0.0.1', '+short', host],
-    ['+short', host],
+    ['@1.1.1.1', '+short', 'A', host],
+    ['@1.1.1.1', '+short', 'AAAA', host],
+    ['@1.0.0.1', '+short', 'A', host],
+    ['@1.0.0.1', '+short', 'AAAA', host],
+    ['+short', 'A', host],
+    ['+short', 'AAAA', host],
   ]) {
     try {
       const { stdout } = await execFile('dig', args, {
         timeout: TIMEOUT_MS,
       });
-      const candidates = stdout
+      candidates.push(...stdout
         .split(/\r?\n/)
         .map(line => line.trim())
-        .filter(Boolean);
-      if (candidates.length > 0) {
-        return candidates;
-      }
+        .filter(Boolean));
     } catch {
       // Try the next resolver path.
     }
@@ -88,18 +85,30 @@ async function resolveWithDig(host) {
     const { stdout } = await execFile('getent', ['hosts', host], {
       timeout: TIMEOUT_MS,
     });
-    return stdout
+    candidates.push(...stdout
       .split(/\r?\n/)
       .flatMap(line => line.trim().split(/\s+/).slice(0, 1))
-      .filter(Boolean);
+      .filter(Boolean));
   } catch {
-    return [];
+    return dedupeCandidates(candidates);
   }
+
+  return dedupeCandidates(candidates);
+}
+
+function dedupeCandidates(candidates) {
+  return [...new Set(candidates)].sort((left, right) => {
+    const leftV6 = left.includes(':');
+    const rightV6 = right.includes(':');
+    if (leftV6 === rightV6) return 0;
+    return leftV6 ? 1 : -1;
+  });
 }
 
 function probeIp({ ip, host, path, port, secure }) {
   return new Promise((resolve, reject) => {
-    const ws = new WebSocket(`${secure ? 'wss' : 'ws'}://${ip}:${port}${path}`, {
+    const socketHost = ip.includes(':') ? `[${ip}]` : ip;
+    const ws = new WebSocket(`${secure ? 'wss' : 'ws'}://${socketHost}:${port}${path}`, {
       servername: secure ? host : undefined,
       headers: { Host: host },
       rejectUnauthorized: true,

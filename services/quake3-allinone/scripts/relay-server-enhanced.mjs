@@ -14,8 +14,9 @@
  */
 
 import dgram from 'node:dgram';
+import fs from 'node:fs';
 import http from 'node:http';
-import { WebSocketServer } from 'ws';
+import { WebSocket, WebSocketServer } from 'ws';
 
 // Configuration from environment
 const TARGET_HOST = process.env.TARGET_HOST || '127.0.0.1';
@@ -23,6 +24,13 @@ const TARGET_PORT = Number(process.env.TARGET_PORT || 27960);
 const PROXY_PORT = Number(process.env.PROXY_PORT || 8080);
 const PROXY_HOST = process.env.PROXY_HOST || '0.0.0.0';
 const DEBUG = process.env.DEBUG === 'true';
+const DEFAULT_PUBLIC_RELAY_HEALTH_URL = process.env.PUBLIC_RELAY_HEALTH_URL || 'https://q3a.a9group.net/healthz';
+const DEFAULT_PUBLIC_RELAY_WEBSOCKET_URL = process.env.PUBLIC_RELAY_WEBSOCKET_URL || 'wss://q3a.a9group.net';
+const DEFAULT_DIAG_TIMEOUT_MS = Number(process.env.PUBLIC_RELAY_DIAG_TIMEOUT_MS || 10000);
+const CLOUDFLARED_TUNNEL_LOG = process.env.CLOUDFLARED_TUNNEL_LOG || '/tmp/cloudflared.log';
+const GAME_PID_FILE = process.env.GAME_PID_FILE || '/tmp/q3-game.pid';
+const RELAY_PID_FILE = process.env.RELAY_PID_FILE || '/tmp/q3-relay.pid';
+const CLOUDFLARED_PID_FILE = process.env.CLOUDFLARED_PID_FILE || '/tmp/cloudflared.pid';
 
 // Metrics
 let activeConnections = 0;
@@ -42,7 +50,124 @@ function sendJson(res, statusCode, payload) {
   res.end(JSON.stringify(payload));
 }
 
-const httpServer = http.createServer((req, res) => {
+function truncate(value, maxLength) {
+  if (typeof value !== 'string' || value.length <= maxLength) {
+    return value;
+  }
+  return value.slice(0, maxLength);
+}
+
+function rootMessage(error) {
+  let current = error;
+  while (current?.cause) current = current.cause;
+  return current?.message || String(current);
+}
+
+function readPidFile(path) {
+  try {
+    const value = fs.readFileSync(path, 'utf8').trim();
+    return value ? Number(value) : null;
+  } catch {
+    return null;
+  }
+}
+
+function isPidRunning(pid) {
+  if (!pid || !Number.isFinite(pid)) {
+    return false;
+  }
+
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function tailFile(path, maxLines) {
+  try {
+    const content = fs.readFileSync(path, 'utf8');
+    return content.split(/\r?\n/).filter(Boolean).slice(-maxLines);
+  } catch {
+    return [];
+  }
+}
+
+async function probeHealth(url, timeoutMs) {
+  const startedAt = Date.now();
+  try {
+    const response = await fetch(url, { method: 'GET', signal: AbortSignal.timeout(timeoutMs) });
+    const body = await response.text();
+    return {
+      ok: response.ok,
+      statusCode: response.status,
+      latencyMs: Date.now() - startedAt,
+      bodySnippet: truncate(body, 400),
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      latencyMs: Date.now() - startedAt,
+      error: rootMessage(error),
+    };
+  }
+}
+
+function probeWebSocket(url, timeoutMs) {
+  const startedAt = Date.now();
+  return new Promise((resolve) => {
+    let settled = false;
+    const timer = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      try { ws.close(); } catch {}
+      resolve({
+        ok: false,
+        latencyMs: Date.now() - startedAt,
+        error: `Timed out after ${timeoutMs}ms`,
+      });
+    }, timeoutMs);
+
+    const ws = new WebSocket(url);
+
+    const finish = (payload) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      resolve(payload);
+    };
+
+    ws.on('open', () => {
+      finish({
+        ok: true,
+        latencyMs: Date.now() - startedAt,
+        state: 'opened',
+      });
+      try { ws.close(1000, 'diagnostic'); } catch {}
+    });
+
+    ws.on('error', (error) => {
+      finish({
+        ok: false,
+        latencyMs: Date.now() - startedAt,
+        error: rootMessage(error),
+      });
+    });
+
+    ws.on('close', (code) => {
+      if (!settled) {
+        finish({
+          ok: code === 1000,
+          latencyMs: Date.now() - startedAt,
+          state: `closed:${code}`,
+        });
+      }
+    });
+  });
+}
+
+const httpServer = http.createServer(async (req, res) => {
   if (req.method === 'OPTIONS') {
     setCorsHeaders(res);
     res.writeHead(204);
@@ -74,6 +199,50 @@ const httpServer = http.createServer((req, res) => {
       targetHost: TARGET_HOST,
       targetPort: TARGET_PORT,
       proxyPort: PROXY_PORT,
+    });
+    return;
+  }
+
+  if (req.method === 'GET' && url.pathname === '/diag/public-relay') {
+    const healthUrl = url.searchParams.get('healthUrl') || DEFAULT_PUBLIC_RELAY_HEALTH_URL;
+    const websocketUrl = url.searchParams.get('websocketUrl') || DEFAULT_PUBLIC_RELAY_WEBSOCKET_URL;
+    const timeoutMs = Number(url.searchParams.get('timeoutMs') || DEFAULT_DIAG_TIMEOUT_MS);
+
+    const https = await probeHealth(healthUrl, timeoutMs);
+    const websocket = await probeWebSocket(websocketUrl, timeoutMs);
+
+    sendJson(res, 200, {
+      timestamp: new Date().toISOString(),
+      healthUrl,
+      websocketUrl,
+      timeoutMs,
+      https,
+      websocket,
+      ok: Boolean(https.ok && websocket.ok),
+    });
+    return;
+  }
+
+  if (req.method === 'GET' && url.pathname === '/diag/runtime') {
+    const maxLines = Number(url.searchParams.get('logLines') || 80);
+    const gamePid = readPidFile(GAME_PID_FILE);
+    const relayPid = readPidFile(RELAY_PID_FILE);
+    const cloudflaredPid = readPidFile(CLOUDFLARED_PID_FILE);
+
+    sendJson(res, 200, {
+      timestamp: new Date().toISOString(),
+      processes: {
+        game: { pid: gamePid, running: isPidRunning(gamePid) },
+        relay: { pid: relayPid, running: isPidRunning(relayPid) },
+        cloudflared: { pid: cloudflaredPid, running: isPidRunning(cloudflaredPid) },
+      },
+      cloudflared: {
+        enabled: process.env.ENABLE_CLOUDFLARED === 'true' || process.env.ENABLE_CLOUDFLARED === '1',
+        originUrl: process.env.CLOUDFLARED_ORIGIN_URL || `http://127.0.0.1:${PROXY_PORT}`,
+        protocol: process.env.CLOUDFLARED_PROTOCOL || 'http2',
+        logPath: CLOUDFLARED_TUNNEL_LOG,
+        recentLogLines: tailFile(CLOUDFLARED_TUNNEL_LOG, maxLines),
+      },
     });
     return;
   }
