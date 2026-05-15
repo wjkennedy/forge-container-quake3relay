@@ -29,10 +29,31 @@ CLOUDFLARED_LOG_TAIL_PID=""
 WEBSOCKET_CHECK_SCRIPT="/opt/forge-q3/scripts/check-relay-websocket.mjs"
 LAST_PUBLIC_CHECK_EPOCH=0
 
+log() {
+  printf '[entrypoint] %s\n' "$*" >&2
+}
+
+bool_state() {
+  case "${1:-}" in
+    1|true|TRUE|yes|YES|on|ON) echo "true" ;;
+    *) echo "false" ;;
+  esac
+}
+
 Q3_HOME="${Q3_HOME:-/tmp/ioquake3-home}"
 mkdir -p "$Q3_HOME/baseq3" /tmp/forge-q3
 
+log "booting all-in-one relay container"
+log "server_port=${SERVER_PORT} game_port=${GAME_PORT} public_hostname=${PUBLIC_HOSTNAME}"
+log "enable_cloudflared=$(bool_state "${ENABLE_CLOUDFLARED}") strict_startup_checks=$(bool_state "${STRICT_STARTUP_CHECKS}")"
+if [[ -n "${CLOUDFLARED_TOKEN:-}" ]]; then
+  log "cloudflared_token_present=true"
+else
+  log "cloudflared_token_present=false"
+fi
+
 if [ -f /opt/ioquake3/demoq3/pak0.pk3 ]; then
+  log "starting ioquake3 with demoq3 assets"
   /usr/lib/ioquake3/ioq3ded \
     +set dedicated "$DEDICATED_MODE" \
     +set sv_pure 0 \
@@ -45,6 +66,7 @@ if [ -f /opt/ioquake3/demoq3/pak0.pk3 ]; then
     +set fs_game "" \
     +exec server.cfg &
 elif [ -f /opt/ioquake3/baseq3/pak0.pk3 ]; then
+  log "starting ioquake3 with baseq3 assets"
   /usr/lib/ioquake3/ioq3ded \
     +set dedicated "$DEDICATED_MODE" \
     +set sv_pure 1 \
@@ -59,7 +81,7 @@ else
     exit 1
   fi
 
-  echo "Starting q3 mock UDP server because pak0.pk3 is not present." >&2
+  log "starting q3 mock UDP server because pak0.pk3 is not present"
   Q3MOCK_PORT="$GAME_PORT" node /opt/forge-q3/scripts/q3-mock-server.mjs &
 fi
 
@@ -100,8 +122,10 @@ restart_cloudflared() {
 
 require_local_health() {
   local health_url="http://127.0.0.1:${SERVER_PORT}/healthz"
+  log "waiting for local relay health at ${health_url}"
   for _ in $(seq 1 "${STARTUP_LOCAL_HEALTH_ATTEMPTS}"); do
     if curl -fsS "${health_url}" >/dev/null 2>&1; then
+      log "local relay health passed"
       return 0
     fi
     sleep "${STARTUP_SLEEP_SECONDS}"
@@ -113,13 +137,16 @@ require_local_health() {
 
 require_tunnel_registration() {
   if [[ "${ENABLE_CLOUDFLARED}" != "true" && "${ENABLE_CLOUDFLARED}" != "1" ]]; then
+    log "tunnel registration skipped because cloudflared is disabled"
     return 0
   fi
 
+  log "waiting for cloudflared tunnel registration"
   local tunnel_logs=""
   for _ in $(seq 1 "${STARTUP_TUNNEL_ATTEMPTS}"); do
     tunnel_logs="$(tail -n 200 "${CLOUDFLARED_TUNNEL_LOG}" 2>/dev/null || true)"
     if grep -Eq 'Registered tunnel connection|Connection [A-Za-z0-9]+ registered|INF Registered tunnel connection' <<<"${tunnel_logs}"; then
+      log "cloudflared tunnel registration passed"
       return 0
     fi
     if grep -Eqi 'unauthorized|invalid token|403|serve tunnel error|failed to dial|i/o timeout|http_status:404' <<<"${tunnel_logs}"; then
@@ -145,8 +172,10 @@ check_public_websocket_once() {
 
 require_public_path() {
   local attempts="${1:-${STARTUP_PUBLIC_ATTEMPTS}}"
+  log "waiting for public relay path ${PUBLIC_HTTP_URL} / ${PUBLIC_WS_URL}"
   for _ in $(seq 1 "${attempts}"); do
     if check_public_health_once && check_public_websocket_once; then
+      log "public relay path passed"
       return 0
     fi
     sleep "${STARTUP_SLEEP_SECONDS}"
@@ -173,9 +202,11 @@ done
 node /opt/forge-q3/scripts/relay-server-enhanced.mjs &
 RELAY_PID="$!"
 printf '%s\n' "${RELAY_PID}" > "${RELAY_PID_FILE}"
+log "relay process started pid=${RELAY_PID}"
 
 start_cloudflared_log_tail() {
   if [[ "${ENABLE_CLOUDFLARED}" != "true" && "${ENABLE_CLOUDFLARED}" != "1" ]]; then
+    log "cloudflared log tail skipped because cloudflared is disabled"
     return 0
   fi
 
@@ -185,10 +216,12 @@ start_cloudflared_log_tail() {
       | sed -u 's/^/[cloudflared] /'
   ) &
   CLOUDFLARED_LOG_TAIL_PID="$!"
+  log "cloudflared log tail started pid=${CLOUDFLARED_LOG_TAIL_PID}"
 }
 
 start_cloudflared() {
   if [[ "${ENABLE_CLOUDFLARED}" != "true" && "${ENABLE_CLOUDFLARED}" != "1" ]]; then
+    log "cloudflared start skipped because cloudflared is disabled"
     return 0
   fi
 
@@ -197,7 +230,7 @@ start_cloudflared() {
     exit 1
   fi
 
-  echo "Starting cloudflared tunnel to ${CLOUDFLARED_ORIGIN_URL}" >&2
+  log "starting cloudflared tunnel to ${CLOUDFLARED_ORIGIN_URL} with protocol=${CLOUDFLARED_PROTOCOL}"
   /usr/local/bin/cloudflared \
     tunnel \
     --no-autoupdate \
@@ -207,18 +240,25 @@ start_cloudflared() {
     --token "${CLOUDFLARED_TOKEN}" >>"${CLOUDFLARED_TUNNEL_LOG}" 2>&1 &
   CLOUDFLARED_PID="$!"
   printf '%s\n' "${CLOUDFLARED_PID}" > "${CLOUDFLARED_PID_FILE}"
+  log "cloudflared process started pid=${CLOUDFLARED_PID}"
 }
 
 if [[ "${ENABLE_CLOUDFLARED}" == "true" || "${ENABLE_CLOUDFLARED}" == "1" ]]; then
   start_cloudflared_log_tail
   start_cloudflared
+else
+  log "cloudflared disabled for this container start"
 fi
 
 if [[ "${STRICT_STARTUP_CHECKS}" == "1" || "${STRICT_STARTUP_CHECKS}" == "true" ]]; then
+  log "running strict startup checks"
   require_local_health
   require_tunnel_registration
   require_public_path
   LAST_PUBLIC_CHECK_EPOCH="$(date +%s)"
+  log "strict startup checks passed"
+else
+  log "strict startup checks disabled"
 fi
 
 while true; do
