@@ -6,6 +6,7 @@ The active service runs both processes in one Forge-compatible container:
 
 - `ioq3ded` listens on `127.0.0.1:27960/udp`.
 - `scripts/relay-server-enhanced.mjs` listens on `SERVER_PORT`, default `8080`.
+- `cloudflared` can optionally run in the same container service using a tunnel token.
 - Browser clients connect over WebSocket to the relay.
 - The relay forwards binary WebSocket frames to the local UDP game server.
 
@@ -138,6 +139,13 @@ npm run tunnel:down
 For a persistent tunnel on `q3a.a9group.net`, use
 [docs/CLOUDFLARE_TUNNEL.md](docs/CLOUDFLARE_TUNNEL.md).
 
+For continuous self-healing of the local relay + tunnel stack plus Forge health
+checks, run:
+
+```bash
+npm run relay:supervise
+```
+
 ## Forge Deployment
 
 The active Forge config is in `manifest.yml`:
@@ -155,6 +163,16 @@ TAG=q3-allinone-test-20260421 \
 scripts/prepare-quake3-container-test.sh
 ```
 
+For the full demo path, including `forge containers create`, push, deploy, and
+site install upgrade:
+
+```bash
+npm run forge:demo
+```
+
+That workflow is documented in
+[docs/FORGE_IMAGE_AND_TUNNEL_RUNBOOK.md](docs/FORGE_IMAGE_AND_TUNNEL_RUNBOOK.md).
+
 Useful Forge checks after deploy:
 
 ```bash
@@ -162,6 +180,37 @@ forge show containers -e development
 forge show services -e development
 forge webtrigger -e development
 ```
+
+The Forge service also exposes a public relay diagnostic webtrigger:
+
+```bash
+forge webtrigger create -e development -s a9data.atlassian.net -p Jira -f q3-relay-public-diag-trigger
+```
+
+That trigger calls the hosted container route `/diag/public-relay`, which probes
+`https://q3a.a9group.net/healthz` and `wss://q3a.a9group.net` from inside
+Forge.
+
+Forge deploys the `q3-relay` container only. It does not launch `cloudflared`
+unless you explicitly enable it in the all-in-one image with Forge environment
+variables. The supported hosted mode is token-based:
+
+```text
+ENABLE_CLOUDFLARED=true
+CLOUDFLARED_TOKEN=<cloudflare tunnel token>
+```
+
+In that mode, the container entrypoint supervises three processes:
+
+- `ioq3ded`
+- the WebSocket relay
+- `cloudflared tunnel run --token ...`
+
+If `cloudflared` exits, it is restarted in-process. If the game server or relay
+exits, the container exits non-zero so Forge can restart the service.
+
+Without those environment variables, `q3a.a9group.net` still depends on the
+local Docker + Cloudflare workflow in `start-lan-party.sh`.
 
 ## Ported Parity Content
 

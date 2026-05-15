@@ -31,6 +31,8 @@ const CLOUDFLARED_TUNNEL_LOG = process.env.CLOUDFLARED_TUNNEL_LOG || '/tmp/cloud
 const GAME_PID_FILE = process.env.GAME_PID_FILE || '/tmp/q3-game.pid';
 const RELAY_PID_FILE = process.env.RELAY_PID_FILE || '/tmp/q3-relay.pid';
 const CLOUDFLARED_PID_FILE = process.env.CLOUDFLARED_PID_FILE || '/tmp/cloudflared.pid';
+const CLOUDFLARED_TUNNEL_NAME = process.env.CLOUDFLARED_TUNNEL_NAME || null;
+const CLOUDFLARED_TUNNEL_ID = process.env.CLOUDFLARED_TUNNEL_ID || null;
 
 // Metrics
 let activeConnections = 0;
@@ -91,6 +93,19 @@ function tailFile(path, maxLines) {
     return content.split(/\r?\n/).filter(Boolean).slice(-maxLines);
   } catch {
     return [];
+  }
+}
+
+function decodeTunnelIdFromToken(token) {
+  if (typeof token !== 'string' || token.length < 20) {
+    return null;
+  }
+
+  try {
+    const payload = JSON.parse(Buffer.from(token, 'base64').toString('utf8'));
+    return payload?.t || null;
+  } catch {
+    return null;
   }
 }
 
@@ -229,6 +244,7 @@ const httpServer = http.createServer(async (req, res) => {
     const relayPid = readPidFile(RELAY_PID_FILE);
     const cloudflaredPid = readPidFile(CLOUDFLARED_PID_FILE);
 
+    const tokenTunnelId = decodeTunnelIdFromToken(process.env.CLOUDFLARED_TOKEN || '');
     sendJson(res, 200, {
       timestamp: new Date().toISOString(),
       processes: {
@@ -240,6 +256,10 @@ const httpServer = http.createServer(async (req, res) => {
         enabled: process.env.ENABLE_CLOUDFLARED === 'true' || process.env.ENABLE_CLOUDFLARED === '1',
         originUrl: process.env.CLOUDFLARED_ORIGIN_URL || `http://127.0.0.1:${PROXY_PORT}`,
         protocol: process.env.CLOUDFLARED_PROTOCOL || 'http2',
+        configuredTunnelName: CLOUDFLARED_TUNNEL_NAME,
+        configuredTunnelId: CLOUDFLARED_TUNNEL_ID,
+        tokenTunnelId,
+        tokenMatchesConfiguredId: tokenTunnelId && CLOUDFLARED_TUNNEL_ID ? tokenTunnelId === CLOUDFLARED_TUNNEL_ID : null,
         logPath: CLOUDFLARED_TUNNEL_LOG,
         recentLogLines: tailFile(CLOUDFLARED_TUNNEL_LOG, maxLines),
       },

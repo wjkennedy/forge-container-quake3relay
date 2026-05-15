@@ -22,6 +22,9 @@ That script:
 - validates that the credentials JSON matches the resolved tunnel ID
 - generates `.cloudflared/config.yml` and `.cloudflared/credentials.json` for
   Docker
+- writes the Docker runtime config with the resolved tunnel UUID when one is
+  available, so the `cloudflared` container does not need tunnel-name lookup at
+  startup
 - can run `cloudflared tunnel route dns <tunnel> <hostname>` as part of prep
 - optionally refreshes the token for token mode and writes
   `.cloudflared/token.txt`
@@ -151,6 +154,12 @@ npm run tunnel:local-managed:down
 
 The source credentials JSON still lives under `~/.cloudflared`, but Docker now
 mounts the validated runtime copy from `.cloudflared/credentials.json`.
+
+## Forge Boundary
+
+The hosted Forge service does not start `cloudflared` for you. In this repo,
+Forge runs the `q3-relay` container, while `q3a.a9group.net` is established by
+the separate local Docker + Cloudflare tunnel flow.
 
 ## Notes
 
