@@ -24,6 +24,7 @@ RUN mkdir -p /opt/ioquake3/baseq3 /opt/ioquake3/demoq3
 COPY services/quake3-allinone/scripts/relay-server-enhanced.mjs ./scripts/relay-server-enhanced.mjs
 COPY services/quake3-allinone/scripts/q3-mock-server.mjs ./scripts/q3-mock-server.mjs
 COPY services/quake3-allinone/scripts/rcon-client.mjs ./scripts/rcon-client.mjs
+COPY services/quake3-allinone/scripts/forge-allinone-entrypoint.sh ./scripts/forge-allinone-entrypoint.sh
 COPY scripts/check-relay-websocket.mjs ./scripts/check-relay-websocket.mjs
 COPY services/quake3-allinone/baseq3/ /opt/ioquake3/baseq3/
 COPY services/quake3-allinone/demoq3/ /opt/ioquake3/demoq3/
