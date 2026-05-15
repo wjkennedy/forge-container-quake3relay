@@ -29,7 +29,7 @@ COPY services/quake3-allinone/baseq3/ /opt/ioquake3/baseq3/
 COPY services/quake3-allinone/demoq3/ /opt/ioquake3/demoq3/
 COPY services/quake3-allinone/server.cfg /opt/ioquake3/demoq3/server.cfg
 COPY --from=cloudflared /usr/local/bin/cloudflared /usr/local/bin/cloudflared
-COPY scripts/forge-allinone-entrypoint.sh /usr/local/bin/forge-allinone-entrypoint.sh
+COPY services/quake3-allinone/scripts/forge-allinone-entrypoint.sh /usr/local/bin/forge-allinone-entrypoint.sh
 
 RUN chmod 0555 /usr/local/bin/forge-allinone-entrypoint.sh \
     && chmod 0555 /usr/local/bin/cloudflared \
