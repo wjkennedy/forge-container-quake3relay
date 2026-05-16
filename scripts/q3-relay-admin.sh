@@ -4,6 +4,25 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "${ROOT_DIR}"
 
+load_dotenv_defaults() {
+  [[ -f .env ]] || return 0
+
+  local line key
+  while IFS= read -r line || [[ -n "${line}" ]]; do
+    [[ "${line}" =~ ^[[:space:]]*# ]] && continue
+    [[ "${line}" =~ ^[[:space:]]*$ ]] && continue
+
+    key="${line%%=*}"
+    key="${key#"${key%%[![:space:]]*}"}"
+    key="${key%"${key##*[![:space:]]}"}"
+    [[ "${key}" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] || continue
+
+    if [[ -z "${!key+x}" ]]; then
+      eval "export ${line}"
+    fi
+  done < .env
+}
+
 DEFAULT_PUBLIC_HOSTNAME="q3a.a9group.net"
 DEFAULT_LOCAL_HOST_PORT="${HOST_PORT:-8080}"
 DEFAULT_FORGE_ENV="${FORGE_ENV:-development}"
@@ -53,12 +72,7 @@ FORGE_SERVICE_KEY="${FORGE_SERVICE_KEY:-$DEFAULT_SERVICE_KEY}"
 FORGE_WEBTRIGGER_KEY="${FORGE_WEBTRIGGER_KEY:-$DEFAULT_WEBTRIGGER_KEY}"
 
 load_env_files() {
-  if [[ -f .env ]]; then
-    set -a
-    # shellcheck disable=SC1091
-    source .env
-    set +a
-  fi
+  load_dotenv_defaults
 
   if [[ -f .cloudflared/runtime.env ]]; then
     set -a

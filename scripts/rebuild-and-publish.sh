@@ -16,7 +16,8 @@ Optional environment:
   IMAGE_NAME                Local image name. Default: forge-q3-allinone
   DOCKERFILE                Dockerfile path.
                             Default: services/quake3-allinone/Dockerfile
-  BUILD_CONTEXT             Docker build context. Default: .
+  BUILD_CONTEXT             Docker build context.
+                            Default: services/quake3-allinone
   PLATFORM                  Docker build platform. Default: linux/amd64
 
   FORGE_IMAGE               Full Forge registry image ref, for example:
@@ -66,7 +67,7 @@ fi
 
 IMAGE_NAME="${IMAGE_NAME:-forge-q3-allinone}"
 DOCKERFILE="${DOCKERFILE:-services/quake3-allinone/Dockerfile}"
-BUILD_CONTEXT="${BUILD_CONTEXT:-.}"
+BUILD_CONTEXT="${BUILD_CONTEXT:-services/quake3-allinone}"
 PLATFORM="${PLATFORM:-linux/amd64}"
 FORGE_ENV="${FORGE_ENV:-development}"
 

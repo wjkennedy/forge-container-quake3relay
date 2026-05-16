@@ -4,12 +4,26 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "${ROOT_DIR}"
 
-if [[ -f .env ]]; then
-  set -a
-  # shellcheck disable=SC1091
-  source .env
-  set +a
-fi
+load_dotenv_defaults() {
+  [[ -f .env ]] || return 0
+
+  local line key
+  while IFS= read -r line || [[ -n "${line}" ]]; do
+    [[ "${line}" =~ ^[[:space:]]*# ]] && continue
+    [[ "${line}" =~ ^[[:space:]]*$ ]] && continue
+
+    key="${line%%=*}"
+    key="${key#"${key%%[![:space:]]*}"}"
+    key="${key%"${key##*[![:space:]]}"}"
+    [[ "${key}" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] || continue
+
+    if [[ -z "${!key+x}" ]]; then
+      eval "export ${line}"
+    fi
+  done < .env
+}
+
+load_dotenv_defaults
 
 CLOUDFLARED_TUNNEL_NAME="${CLOUDFLARED_TUNNEL_NAME:-q3-websocket}"
 CLOUDFLARED_PUBLIC_HOSTNAME="${CLOUDFLARED_PUBLIC_HOSTNAME:-q3a.a9group.net}"
@@ -25,6 +39,7 @@ CLOUDFLARED_ORIGIN_CERT="${CLOUDFLARED_ORIGIN_CERT:-$CLOUDFLARED_CREDENTIALS_DIR
 CLOUDFLARED_RUNTIME_CONFIG="${CLOUDFLARED_RUNTIME_DIR}/config.yml"
 CLOUDFLARED_RUNTIME_CREDENTIALS="${CLOUDFLARED_RUNTIME_DIR}/credentials.json"
 CLOUDFLARED_RUNTIME_TOKEN_FILE="${CLOUDFLARED_RUNTIME_DIR}/token.txt"
+CLOUDFLARED_RUNTIME_ORIGIN_CERT="${CLOUDFLARED_RUNTIME_DIR}/cert.pem"
 CLOUDFLARED_RUNTIME_ENV="${CLOUDFLARED_RUNTIME_DIR}/runtime.env"
 
 if ! command -v jq >/dev/null 2>&1; then
@@ -167,34 +182,6 @@ refresh_token_by_name() {
   effective_token="${refreshed_token}"
 }
 
-route_dns_hostname() {
-  if ! command -v cloudflared >/dev/null 2>&1; then
-    return 1
-  fi
-
-  if [[ ! -f "${CLOUDFLARED_ORIGIN_CERT}" ]]; then
-    return 1
-  fi
-
-  if [[ -z "${resolved_tunnel_name}" ]]; then
-    return 1
-  fi
-
-  local route_args=(
-    --origincert "${CLOUDFLARED_ORIGIN_CERT}"
-    tunnel
-    route
-    dns
-  )
-
-  if [[ "${CLOUDFLARED_ROUTE_DNS_OVERWRITE}" == "true" || "${CLOUDFLARED_ROUTE_DNS_OVERWRITE}" == "1" ]]; then
-    route_args+=(--overwrite-dns)
-  fi
-
-  route_args+=("${resolved_tunnel_name}" "${CLOUDFLARED_PUBLIC_HOSTNAME}")
-  cloudflared "${route_args[@]}"
-}
-
 case "${CLOUDFLARED_TUNNEL_MODE}" in
   auto|local-managed|token)
     ;;
@@ -309,22 +296,6 @@ case "${CLOUDFLARED_TUNNEL_MODE}" in
     ;;
 esac
 
-case "${CLOUDFLARED_ROUTE_DNS}" in
-  auto)
-    route_dns_hostname >/dev/null 2>&1 || true
-    ;;
-  always)
-    echo "Ensuring DNS route ${CLOUDFLARED_PUBLIC_HOSTNAME} -> ${resolved_tunnel_name}..."
-    if ! route_dns_hostname; then
-      echo "Failed to provision DNS route for ${CLOUDFLARED_PUBLIC_HOSTNAME}." >&2
-      echo "Run 'cloudflared tunnel route dns ${resolved_tunnel_name} ${CLOUDFLARED_PUBLIC_HOSTNAME}' manually or fix local cloudflared auth." >&2
-      exit 1
-    fi
-    ;;
-  never)
-    ;;
-esac
-
 if [[ "${CLOUDFLARED_TUNNEL_MODE}" == "token" ]]; then
   effective_token="$(printf '%s' "${effective_token}" | tr -d '[:space:]')"
 
@@ -344,6 +315,13 @@ if [[ -n "${credentials_source_file}" ]]; then
   cp "${credentials_source_file}" "${CLOUDFLARED_RUNTIME_CREDENTIALS}"
   chmod 600 "${CLOUDFLARED_RUNTIME_CREDENTIALS}"
 fi
+
+if [[ -f "${CLOUDFLARED_ORIGIN_CERT}" ]]; then
+  cp "${CLOUDFLARED_ORIGIN_CERT}" "${CLOUDFLARED_RUNTIME_ORIGIN_CERT}"
+else
+  : > "${CLOUDFLARED_RUNTIME_ORIGIN_CERT}"
+fi
+chmod 600 "${CLOUDFLARED_RUNTIME_ORIGIN_CERT}"
 
 cat > "${CLOUDFLARED_RUNTIME_CONFIG}" <<EOF
 tunnel: ${resolved_tunnel_ref}
@@ -375,6 +353,7 @@ CLOUDFLARED_RUNTIME_CONFIG=${CLOUDFLARED_RUNTIME_CONFIG}
 CLOUDFLARED_RUNTIME_CREDENTIALS=${CLOUDFLARED_RUNTIME_CREDENTIALS}
 CLOUDFLARED_RUNTIME_TOKEN_FILE=${CLOUDFLARED_RUNTIME_TOKEN_FILE}
 CLOUDFLARED_ORIGIN_CERT=${CLOUDFLARED_ORIGIN_CERT}
+CLOUDFLARED_RUNTIME_ORIGIN_CERT=${CLOUDFLARED_RUNTIME_ORIGIN_CERT}
 EOF
 chmod 600 "${CLOUDFLARED_RUNTIME_ENV}"
 
@@ -385,6 +364,9 @@ echo "  tunnel id:   ${resolved_tunnel_id}"
 echo "  config ref:  ${resolved_tunnel_ref}"
 if [[ -n "${credentials_source_file}" ]]; then
   echo "  credentials: ${credentials_source_file}"
+fi
+if [[ -f "${CLOUDFLARED_ORIGIN_CERT}" ]]; then
+  echo "  origin cert: ${CLOUDFLARED_ORIGIN_CERT}"
 fi
 echo "  config:      ${CLOUDFLARED_RUNTIME_CONFIG}"
 if [[ -n "${effective_token}" ]]; then

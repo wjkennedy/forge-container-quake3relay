@@ -25,7 +25,10 @@ That script:
 - writes the Docker runtime config with the resolved tunnel UUID when one is
   available, so the `cloudflared` container does not need tunnel-name lookup at
   startup
-- can run `cloudflared tunnel route dns <tunnel> <hostname>` as part of prep
+- can sync the remote published hostname config through the Cloudflare API when
+  `CLOUDFLARED_API_TOKEN` is available
+- can run `cloudflared tunnel route dns <tunnel> <hostname>` from the Docker
+  `cloudflared` container during bringup
 - optionally refreshes the token for token mode and writes
   `.cloudflared/token.txt`
 
@@ -120,10 +123,25 @@ To make DNS routing part of bringup, set:
 CLOUDFLARED_ROUTE_DNS=always
 ```
 
-Then `scripts/prepare-cloudflared-tunnel.sh` will run:
+Then `start-lan-party.sh` will run this from the Docker `cloudflared`
+container:
 
 ```bash
 cloudflared tunnel route dns q3-websocket q3a.a9group.net
+```
+
+If the tunnel is remotely managed and you want bringup to repair the published
+hostname mapping too, provide an API token with tunnel edit permission:
+
+```bash
+export CLOUDFLARED_API_TOKEN='<cloudflare api token>'
+export CLOUDFLARED_REMOTE_CONFIG_SYNC=always
+```
+
+That lets `start-lan-party.sh` update the remote tunnel config to:
+
+```text
+q3a.a9group.net -> http://q3-relay:8080
 ```
 
 ## Locally Managed q3a Tunnel

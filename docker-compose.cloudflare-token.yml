@@ -5,5 +5,6 @@ services:
     command: tunnel --no-autoupdate --protocol http2 --url ${CLOUDFLARED_ORIGIN_URL:-http://q3-relay:8080} run --token-file /etc/cloudflared/token.txt
     volumes:
       - ${CLOUDFLARED_RUNTIME_TOKEN_FILE:?Run scripts/prepare-cloudflared-tunnel.sh}:/etc/cloudflared/token.txt:ro
+      - ${CLOUDFLARED_RUNTIME_ORIGIN_CERT:?Run scripts/prepare-cloudflared-tunnel.sh}:/etc/cloudflared/cert.pem:ro
     depends_on:
       - q3-relay
