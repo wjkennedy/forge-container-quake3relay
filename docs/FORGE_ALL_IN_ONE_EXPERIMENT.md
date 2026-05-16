@@ -18,11 +18,10 @@ image.
 ## Build
 
 ```bash
-docker build -f Dockerfile.forge-allinone \
+docker build services/quake3-allinone \
   --platform linux/amd64 \
   -t forge-q3-allinone:local \
-  -t forge-q3-allinone:q3-allinone-test-20260421 \
-  .
+  -t forge-q3-allinone:q3-allinone-test-20260421
 ```
 
 ## Local Smoke Test
