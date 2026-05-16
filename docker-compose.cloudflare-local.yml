@@ -6,5 +6,6 @@ services:
     volumes:
       - ${CLOUDFLARED_RUNTIME_CONFIG:?Run scripts/prepare-cloudflared-tunnel.sh}:/etc/cloudflared/config.yml:ro
       - ${CLOUDFLARED_RUNTIME_CREDENTIALS:?Run scripts/prepare-cloudflared-tunnel.sh}:/etc/cloudflared/credentials.json:ro
+      - ${CLOUDFLARED_RUNTIME_ORIGIN_CERT:?Run scripts/prepare-cloudflared-tunnel.sh}:/etc/cloudflared/cert.pem:ro
     depends_on:
       - q3-relay

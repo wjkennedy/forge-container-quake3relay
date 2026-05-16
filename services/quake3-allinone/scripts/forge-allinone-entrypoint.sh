@@ -17,6 +17,7 @@ PUBLIC_HOSTNAME="${PUBLIC_HOSTNAME:-q3a.a9group.net}"
 PUBLIC_HTTP_URL="${PUBLIC_HTTP_URL:-https://${PUBLIC_HOSTNAME}/healthz}"
 PUBLIC_WS_URL="${PUBLIC_WS_URL:-wss://${PUBLIC_HOSTNAME}}"
 STRICT_STARTUP_CHECKS="${STRICT_STARTUP_CHECKS:-1}"
+STARTUP_PUBLIC_PATH_CHECK="${STARTUP_PUBLIC_PATH_CHECK:-auto}"
 STARTUP_LOCAL_HEALTH_ATTEMPTS="${STARTUP_LOCAL_HEALTH_ATTEMPTS:-60}"
 STARTUP_TUNNEL_ATTEMPTS="${STARTUP_TUNNEL_ATTEMPTS:-30}"
 STARTUP_PUBLIC_ATTEMPTS="${STARTUP_PUBLIC_ATTEMPTS:-20}"
@@ -40,12 +41,34 @@ bool_state() {
   esac
 }
 
+should_check_public_path_on_startup() {
+  case "${STARTUP_PUBLIC_PATH_CHECK:-auto}" in
+    1|true|TRUE|yes|YES|on|ON)
+      echo "true"
+      ;;
+    0|false|FALSE|no|NO|off|OFF)
+      echo "false"
+      ;;
+    auto|AUTO|"")
+      if [[ "${ENABLE_CLOUDFLARED}" == "true" || "${ENABLE_CLOUDFLARED}" == "1" ]]; then
+        echo "true"
+      else
+        echo "false"
+      fi
+      ;;
+    *)
+      echo "false"
+      ;;
+  esac
+}
+
 Q3_HOME="${Q3_HOME:-/tmp/ioquake3-home}"
 mkdir -p "$Q3_HOME/baseq3" /tmp/forge-q3
 
 log "booting all-in-one relay container"
 log "server_port=${SERVER_PORT} game_port=${GAME_PORT} public_hostname=${PUBLIC_HOSTNAME}"
 log "enable_cloudflared=$(bool_state "${ENABLE_CLOUDFLARED}") strict_startup_checks=$(bool_state "${STRICT_STARTUP_CHECKS}")"
+log "startup_public_path_check=$(should_check_public_path_on_startup)"
 if [[ -n "${CLOUDFLARED_TOKEN:-}" ]]; then
   log "cloudflared_token_present=true"
 else
@@ -254,8 +277,12 @@ if [[ "${STRICT_STARTUP_CHECKS}" == "1" || "${STRICT_STARTUP_CHECKS}" == "true" 
   log "running strict startup checks"
   require_local_health
   require_tunnel_registration
-  require_public_path
-  LAST_PUBLIC_CHECK_EPOCH="$(date +%s)"
+  if [[ "$(should_check_public_path_on_startup)" == "true" ]]; then
+    require_public_path
+    LAST_PUBLIC_CHECK_EPOCH="$(date +%s)"
+  else
+    log "public path startup check skipped"
+  fi
   log "strict startup checks passed"
 else
   log "strict startup checks disabled"
@@ -285,8 +312,10 @@ while true; do
     start_cloudflared
     if [[ "${STRICT_STARTUP_CHECKS}" == "1" || "${STRICT_STARTUP_CHECKS}" == "true" ]]; then
       require_tunnel_registration
-      require_public_path
-      LAST_PUBLIC_CHECK_EPOCH="$(date +%s)"
+      if [[ "$(should_check_public_path_on_startup)" == "true" ]]; then
+        require_public_path
+        LAST_PUBLIC_CHECK_EPOCH="$(date +%s)"
+      fi
     fi
   fi
 

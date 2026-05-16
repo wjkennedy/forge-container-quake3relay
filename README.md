@@ -93,7 +93,10 @@ By default it uses `TUNNEL_MODE=auto`:
 - it resolves the named tunnel from `CLOUDFLARED_TUNNEL_NAME` when possible
 - it validates the credentials JSON contents instead of trusting a hardcoded
   filename or UUID
-- it can ensure the DNS route with `cloudflared tunnel route dns`
+- it can optionally self-heal the remote published hostname config through the
+  Cloudflare API when `CLOUDFLARED_API_TOKEN` is set
+- it can ensure the DNS route from the Docker `cloudflared` container with
+  `cloudflared tunnel route dns`
 - it prefers the locally managed tunnel when credentials are available
 - otherwise it falls back to the dashboard-token tunnel using
   `CLOUDFLARED_TOKEN`
@@ -118,6 +121,13 @@ If you want DNS route creation to be enforced during prep, set:
 
 ```bash
 CLOUDFLARED_ROUTE_DNS=always
+```
+
+If you want startup to enforce the remote published-hostname config too, set:
+
+```bash
+CLOUDFLARED_API_TOKEN=<cloudflare api token>
+CLOUDFLARED_REMOTE_CONFIG_SYNC=always
 ```
 
 ## Cloudflare Quick Tunnel

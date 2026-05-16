@@ -4,6 +4,25 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "${ROOT_DIR}"
 
+load_dotenv_defaults() {
+  [[ -f .env ]] || return 0
+
+  local line key
+  while IFS= read -r line || [[ -n "${line}" ]]; do
+    [[ "${line}" =~ ^[[:space:]]*# ]] && continue
+    [[ "${line}" =~ ^[[:space:]]*$ ]] && continue
+
+    key="${line%%=*}"
+    key="${key#"${key%%[![:space:]]*}"}"
+    key="${key%"${key##*[![:space:]]}"}"
+    [[ "${key}" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] || continue
+
+    if [[ -z "${!key+x}" ]]; then
+      eval "export ${line}"
+    fi
+  done < .env
+}
+
 LOCAL_SERVICE_NAME="q3-relay"
 RCON_SHELL_SCRIPT="${ROOT_DIR}/rcon-shell.sh"
 LOCAL_MANAGED_TUNNEL_SERVICE_NAME="cloudflared-local"
@@ -12,12 +31,144 @@ PREPARE_TUNNEL_SCRIPT="${ROOT_DIR}/scripts/prepare-cloudflared-tunnel.sh"
 WEBSOCKET_CHECK_SCRIPT="${ROOT_DIR}/scripts/check-relay-websocket.mjs"
 TUNNEL_MODE="${TUNNEL_MODE:-auto}"
 
-if [[ -f .env ]]; then
-  set -a
-  # shellcheck disable=SC1091
-  source .env
-  set +a
-fi
+load_dotenv_defaults
+
+maybe_enter_rcon_shell() {
+  if [[ -x "${RCON_SHELL_SCRIPT}" && -t 0 && -t 1 ]]; then
+    echo >&2
+    echo "Local relay is healthy. Opening the local RCON shell even though public tunnel validation failed." >&2
+    exec "${RCON_SHELL_SCRIPT}"
+  fi
+}
+
+ensure_remote_tunnel_config() {
+  local sync_mode="${CLOUDFLARED_REMOTE_CONFIG_SYNC:-auto}"
+
+  case "${sync_mode}" in
+    auto|always|never)
+      ;;
+    *)
+      echo "Unsupported CLOUDFLARED_REMOTE_CONFIG_SYNC: ${sync_mode}. Use auto, always, or never." >&2
+      exit 1
+      ;;
+  esac
+
+  if [[ "${sync_mode}" == "never" ]]; then
+    return 0
+  fi
+
+  if [[ -z "${CLOUDFLARED_API_TOKEN:-}" ]]; then
+    if [[ "${sync_mode}" == "always" ]]; then
+      echo "CLOUDFLARED_REMOTE_CONFIG_SYNC=always, but CLOUDFLARED_API_TOKEN is not set." >&2
+      exit 1
+    fi
+    return 0
+  fi
+
+  if [[ -z "${CLOUDFLARED_TUNNEL_ID:-}" ]]; then
+    if [[ "${sync_mode}" == "always" ]]; then
+      echo "CLOUDFLARED_REMOTE_CONFIG_SYNC=always, but CLOUDFLARED_TUNNEL_ID is empty." >&2
+      exit 1
+    fi
+    return 0
+  fi
+
+  if [[ ! -f "${CLOUDFLARED_RUNTIME_CREDENTIALS:-}" ]]; then
+    if [[ "${sync_mode}" == "always" ]]; then
+      echo "CLOUDFLARED_REMOTE_CONFIG_SYNC=always, but runtime credentials JSON is missing." >&2
+      exit 1
+    fi
+    return 0
+  fi
+
+  local account_id
+  account_id="$(jq -r '.AccountTag // empty' "${CLOUDFLARED_RUNTIME_CREDENTIALS}")"
+  if [[ -z "${account_id}" ]]; then
+    if [[ "${sync_mode}" == "always" ]]; then
+      echo "CLOUDFLARED_REMOTE_CONFIG_SYNC=always, but AccountTag was missing from ${CLOUDFLARED_RUNTIME_CREDENTIALS}." >&2
+      exit 1
+    fi
+    return 0
+  fi
+
+  local config_url="https://api.cloudflare.com/client/v4/accounts/${account_id}/cfd_tunnel/${CLOUDFLARED_TUNNEL_ID}/configurations"
+  local current_config desired_config current_ingress current_service
+
+  if ! current_config="$(curl -fsS \
+    -H "Authorization: Bearer ${CLOUDFLARED_API_TOKEN}" \
+    -H 'Content-Type: application/json' \
+    "${config_url}")"; then
+    if [[ "${sync_mode}" == "always" ]]; then
+      echo "Failed to read the remote Cloudflare tunnel configuration." >&2
+      exit 1
+    fi
+    return 0
+  fi
+
+  current_ingress="$(jq -c '.result.config.ingress // []' <<<"${current_config}")"
+  current_service="$(jq -r --arg hostname "${PUBLIC_HOSTNAME}" '.result.config.ingress // [] | map(select(.hostname == $hostname)) | .[0].service // empty' <<<"${current_config}")"
+
+  if [[ "${current_service}" == "${CLOUDFLARED_ORIGIN_URL}" ]]; then
+    return 0
+  fi
+
+  desired_config="$(jq -cn \
+    --arg hostname "${PUBLIC_HOSTNAME}" \
+    --arg service "${CLOUDFLARED_ORIGIN_URL}" \
+    '{
+      config: {
+        ingress: [
+          {hostname: $hostname, service: $service},
+          {service: "http_status:404"}
+        ],
+        "warp-routing": {enabled: false}
+      }
+    }')"
+
+  echo "Syncing remote Cloudflare tunnel config for ${PUBLIC_HOSTNAME} -> ${CLOUDFLARED_ORIGIN_URL}..."
+  if ! curl -fsS -X PUT \
+    -H "Authorization: Bearer ${CLOUDFLARED_API_TOKEN}" \
+    -H 'Content-Type: application/json' \
+    --data "${desired_config}" \
+    "${config_url}" >/dev/null; then
+    echo "Failed to update the remote Cloudflare tunnel configuration." >&2
+    echo "Current ingress: ${current_ingress}" >&2
+    if [[ "${sync_mode}" == "always" ]]; then
+      exit 1
+    fi
+  fi
+}
+
+ensure_dns_route_via_container() {
+  [[ "${CLOUDFLARED_ROUTE_DNS:-auto}" != "never" ]] || return 0
+
+  if [[ ! -s "${CLOUDFLARED_RUNTIME_ORIGIN_CERT:-}" ]]; then
+    if [[ "${CLOUDFLARED_ROUTE_DNS:-auto}" == "always" ]]; then
+      echo "CLOUDFLARED_ROUTE_DNS=always, but no Cloudflare origin cert is available for containerized DNS routing." >&2
+      echo "Run 'cloudflared tunnel login' locally or set CLOUDFLARED_ORIGIN_CERT to a valid cert.pem before bringup." >&2
+      exit 1
+    fi
+    return 0
+  fi
+
+  local route_args=(run --rm --no-deps "${TUNNEL_SERVICE_NAME}" tunnel --origincert /etc/cloudflared/cert.pem route dns)
+  if [[ "${CLOUDFLARED_ROUTE_DNS_OVERWRITE:-true}" == "true" || "${CLOUDFLARED_ROUTE_DNS_OVERWRITE:-true}" == "1" ]]; then
+    route_args+=(--overwrite-dns)
+  fi
+  route_args+=("${CLOUDFLARED_TUNNEL_NAME:-q3-websocket}" "${PUBLIC_HOSTNAME}")
+
+  if [[ "${CLOUDFLARED_ROUTE_DNS:-auto}" == "always" ]]; then
+    echo "Ensuring DNS route ${PUBLIC_HOSTNAME} -> ${CLOUDFLARED_TUNNEL_NAME:-q3-websocket} from the Cloudflare container..."
+    if ! docker compose "${COMPOSE_FILES[@]}" "${route_args[@]}"; then
+      echo "Failed to provision DNS route for ${PUBLIC_HOSTNAME} from the Cloudflare container." >&2
+      echo "If the hostname is already routed in Cloudflare, retry with CLOUDFLARED_ROUTE_DNS=auto or CLOUDFLARED_ROUTE_DNS=never to skip DNS writes during startup." >&2
+      exit 1
+    fi
+    return 0
+  fi
+
+  docker compose "${COMPOSE_FILES[@]}" "${route_args[@]}" >/dev/null 2>&1 || true
+}
 
 HOST_PORT="${HOST_PORT:-8080}"
 HEALTH_URL="http://127.0.0.1:${HOST_PORT}/healthz"
@@ -90,6 +241,10 @@ if ! docker compose "${COMPOSE_FILES[@]}" config >/dev/null; then
   echo "Docker Compose configuration is invalid." >&2
   exit 1
 fi
+
+ensure_remote_tunnel_config
+
+ensure_dns_route_via_container
 
 echo "Checking local relay port availability on ${HOST_PORT}..."
 if ! python3 - <<'PY' "${HOST_PORT}"
@@ -164,13 +319,16 @@ if grep -Eq 'localhost:8080|\\\"service\\\":\\\"http://localhost:8080\\\"|\\\"se
   echo "Cloudflare tunnel is connected, but its active ingress config still references localhost:8080." >&2
   echo "For this Docker stack, q3a.a9group.net must route only to http://q3-relay:8080." >&2
   echo "Remove any dashboard-managed public hostname rule for ${PUBLIC_HOSTNAME} that points to localhost:8080 or tcp://localhost:8080." >&2
+  maybe_enter_rcon_shell
   exit 1
 fi
 
-if grep -Eq '"ingress":\[\{"service":"http_status:404"\}\]|\\\"ingress\\\":\\\[\\\{\\\"service\\\":\\\"http_status:404\\\"\\\}\\\]' <<<"${tunnel_logs}"; then
+if grep -Eq 'Updated to new configuration config="\{\\"ingress\\":\[\{\\"service\\":\\"http_status:404\\"\}\],\\"warp-routing\\":\{\\"enabled\\":false\}\}"|\\\"ingress\\\":\\\[\\\{\\\"service\\\":\\\"http_status:404\\\"\\\}\\\]' <<<"${tunnel_logs}"; then
   echo "Cloudflare tunnel is connected, but its active config only serves http_status:404." >&2
-  echo "The hostname ${PUBLIC_HOSTNAME} is not attached to the tunnel yet." >&2
-  echo "Ensure DNS routing is provisioned with 'cloudflared tunnel route dns ${CLOUDFLARED_TUNNEL_NAME:-q3-websocket} ${PUBLIC_HOSTNAME}'." >&2
+  echo "Cloudflare pushed a remotely managed config update over this tunnel, and that active config has no usable public hostname route yet." >&2
+  echo "Attach ${PUBLIC_HOSTNAME} to tunnel ${CLOUDFLARED_TUNNEL_NAME:-q3-websocket} in the Cloudflare Zero Trust dashboard, or route it to this tunnel with 'cloudflared tunnel route dns ${CLOUDFLARED_TUNNEL_NAME:-q3-websocket} ${PUBLIC_HOSTNAME}'." >&2
+  echo "If you manage public hostnames in the dashboard, the matching service for this Docker stack must be http://q3-relay:8080." >&2
+  maybe_enter_rcon_shell
   exit 1
 fi
 
@@ -195,6 +353,7 @@ if ! curl -fsS --max-time 15 "${PUBLIC_HTTP_URL}" >/dev/null 2>&1; then
     echo "The local relay is up, but the public hostname is not routing correctly yet." >&2
     echo "Cloudflared logs:" >&2
     echo "${tunnel_logs}" >&2
+    maybe_enter_rcon_shell
     exit 1
   fi
 fi
