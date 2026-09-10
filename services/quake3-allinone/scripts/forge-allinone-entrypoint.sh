@@ -257,12 +257,13 @@ start_cloudflared() {
     exit 1
   fi
 
-  log "starting cloudflared tunnel to ${CLOUDFLARED_ORIGIN_URL} with protocol=${CLOUDFLARED_PROTOCOL}"
+  local origin_url="http://127.0.0.1:${SERVER_PORT}"
+  log "starting cloudflared tunnel to ${origin_url} with protocol=${CLOUDFLARED_PROTOCOL}"
   /usr/local/bin/cloudflared \
     tunnel \
     --no-autoupdate \
     --protocol "${CLOUDFLARED_PROTOCOL}" \
-    --url "${CLOUDFLARED_ORIGIN_URL}" \
+    --url "${origin_url}" \
     run \
     --token "${CLOUDFLARED_TOKEN}" >>"${CLOUDFLARED_TUNNEL_LOG}" 2>&1 &
   CLOUDFLARED_PID="$!"
