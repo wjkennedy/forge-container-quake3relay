@@ -12,6 +12,10 @@ ENABLE_CLOUDFLARED="${ENABLE_CLOUDFLARED:-false}"
 CLOUDFLARED_PROTOCOL="${CLOUDFLARED_PROTOCOL:-http2}"
 CLOUDFLARED_RESTART_DELAY_SECONDS="${CLOUDFLARED_RESTART_DELAY_SECONDS:-5}"
 CLOUDFLARED_ORIGIN_URL="${CLOUDFLARED_ORIGIN_URL:-http://127.0.0.1:${SERVER_PORT}}"
+if [[ "${CLOUDFLARED_ORIGIN_URL}" == *q3-relay* ]]; then
+  printf '[entrypoint] rewriting Docker Compose origin %s for single-container deployment\n' "${CLOUDFLARED_ORIGIN_URL}" >&2
+  CLOUDFLARED_ORIGIN_URL="http://127.0.0.1:${SERVER_PORT}"
+fi
 CLOUDFLARED_TUNNEL_LOG="${CLOUDFLARED_TUNNEL_LOG:-/tmp/cloudflared.log}"
 PUBLIC_HOSTNAME="${PUBLIC_HOSTNAME:-q3a.a9group.net}"
 PUBLIC_HTTP_URL="${PUBLIC_HTTP_URL:-https://${PUBLIC_HOSTNAME}/healthz}"
@@ -253,12 +257,13 @@ start_cloudflared() {
     exit 1
   fi
 
-  log "starting cloudflared tunnel to ${CLOUDFLARED_ORIGIN_URL} with protocol=${CLOUDFLARED_PROTOCOL}"
+  local origin_url="http://127.0.0.1:${SERVER_PORT}"
+  log "starting cloudflared tunnel to ${origin_url} with protocol=${CLOUDFLARED_PROTOCOL}"
   /usr/local/bin/cloudflared \
     tunnel \
     --no-autoupdate \
     --protocol "${CLOUDFLARED_PROTOCOL}" \
-    --url "${CLOUDFLARED_ORIGIN_URL}" \
+    --url "${origin_url}" \
     run \
     --token "${CLOUDFLARED_TOKEN}" >>"${CLOUDFLARED_TUNNEL_LOG}" 2>&1 &
   CLOUDFLARED_PID="$!"
